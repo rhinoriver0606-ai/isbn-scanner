@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ISBNスキャナー</title>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 10px;
+    }
+
+    video {
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      margin-top: 10px;
+    }
+
+    button {
+      font-size: 18px;
+      padding: 10px 20px;
+      margin: 10px;
+    }
+
+    #result {
+      font-size: 20px;
+      margin-top: 10px;
+      color: green;
+      word-break: break-all;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>ISBNバーコードスキャナー</h2>
+
+  <button id="startBtn">カメラ起動</button>
+
+  <video id="video" autoplay playsinline></video>
+
+  <div id="result">未スキャン</div>
+
+  <!-- ZXingライブラリ（バーコード読み取り） -->
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const video = document.getElementById('video');
+    const result = document.getElementById('result');
+
+    let codeReader;
+    let stream;
+
+    startBtn.addEventListener('click', async () => {
+      try {
+        // カメラ起動
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment"
+          }
+        });
+
+        video.srcObject = stream;
+
+        // ZXing初期化
+        codeReader = new ZXing.BrowserMultiFormatReader();
+
+        // 読み取り開始
+        codeReader.decodeFromVideoDevice(
+          null,
+          video,
+          (res, err) => {
+            if (res) {
+              const text = res.getText();
+              result.textContent = "ISBN: " + text;
+
+              console.log("読み取り成功:", text);
+
+              // 必要なら停止（1回スキャンで止める）
+              // codeReader.reset();
+              // stream.getTracks().forEach(t => t.stop());
+            }
+
+            if (err && !(err instanceof ZXing.NotFoundException)) {
+              console.error(err);
+            }
+          }
+        );
+
+      } catch (err) {
+        alert("カメラ起動失敗: " + err);
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
