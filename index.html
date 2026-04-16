@@ -157,15 +157,35 @@ function render(data) {
 
 // 🔄 読了切替
 async function toggleStatus(id) {
-  await fetch(GAS_URL + "?action=toggle&id=" + id);
+  await fetch(GAS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+    },
+    body: new URLSearchParams({
+      action: "toggle",
+      id: id
+    })
+  });
+
   loadBooks();
 }
 
 async function deleteBook(id) {
-  await fetch(GAS_URL + "?action=delete&id=" + id);
+  await fetch(GAS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+    },
+    body: new URLSearchParams({
+      action: "delete",
+      id: id
+    })
+  });
+
   loadBooks();
 }
-
+  
 // 📡 カメラ
 document.getElementById("startBtn").addEventListener("click", async () => {
   const stream = await navigator.mediaDevices.getUserMedia({
