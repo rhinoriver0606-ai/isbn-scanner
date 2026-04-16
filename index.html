@@ -43,7 +43,7 @@
 
   <div id="result">未スキャン</div>
 
-  <!-- ZXingライブラリ（バーコード読み取り） -->
+  <!-- ZXing -->
   <script src="https://unpkg.com/@zxing/library@latest"></script>
 
   <script>
@@ -53,6 +53,26 @@
 
     let codeReader;
     let stream;
+
+    // 🔥 ここを自分のGAS URLに変更
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyk0A6_D6Mf_cPFBc9Mgp_iyi8LlXvmw3dvamGO6_3x_lVA02ZmNU_vipudKJRWtT3EiA/exec";
+
+    // スプレッドシートへ送信
+    async function sendToSheet(isbn) {
+      try {
+        await fetch(GAS_URL, {
+          method: "POST",
+          body: JSON.stringify({ isbn }),
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+
+        console.log("送信成功:", isbn);
+      } catch (err) {
+        console.error("送信失敗:", err);
+      }
+    }
 
     startBtn.addEventListener('click', async () => {
       try {
@@ -65,23 +85,20 @@
 
         video.srcObject = stream;
 
-        // ZXing初期化
+        // ZXing開始
         codeReader = new ZXing.BrowserMultiFormatReader();
 
-        // 読み取り開始
         codeReader.decodeFromVideoDevice(
           null,
           video,
           (res, err) => {
             if (res) {
-              const text = res.getText();
-              result.textContent = "ISBN: " + text;
+              const isbn = res.getText();
 
-              console.log("読み取り成功:", text);
+              result.textContent = "ISBN: " + isbn;
 
-              // 必要なら停止（1回スキャンで止める）
-              // codeReader.reset();
-              // stream.getTracks().forEach(t => t.stop());
+              // 🔥 スプレッドシートへ送信
+              sendToSheet(isbn);
             }
 
             if (err && !(err instanceof ZXing.NotFoundException)) {
