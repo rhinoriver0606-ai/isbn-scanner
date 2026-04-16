@@ -1,202 +1,12 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#111111">
-
-<title>蔵書アプリ（PWA版）</title>
-
-<style>
-body {
-  font-family: sans-serif;
-  background: #111;
-  color: white;
-  margin: 0;
-  padding-bottom: 70px;
-}
-
-h2 {
-  text-align: center;
-  padding: 10px;
-}
-
-.page { display: none; padding: 10px; }
-.page.active { display: block; }
-
-video {
-  width: 100%;
-  border-radius: 10px;
-}
-
-.filter {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-select, input, button {
-  padding: 6px;
-  font-size: 14px;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-.series-card {
-  background: #1e1e1e;
-  border-radius: 10px;
-  padding: 10px;
-  cursor: pointer;
-  text-align: center;
-}
-
-.series-card img {
-  width: 100%;
-  height: 140px;
-  object-fit: cover;
-  border-radius: 6px;
-}
-
-.series-title {
-  font-size: 13px;
-  margin-top: 5px;
-}
-
-.volume {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-  align-items: center;
-}
-
-.volume img {
-  width: 50px;
-  height: 70px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-
-.tabbar {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  display: flex;
-  background: #222;
-}
-
-.tabbar button {
-  flex: 1;
-  padding: 12px;
-  background: none;
-  border: none;
-  color: white;
-}
-
-.carousel {
-  display: flex;
-  overflow-x: auto;
-  gap: 8px;
-  padding: 10px;
-  scroll-snap-type: x mandatory;
-}
-
-.carousel::-webkit-scrollbar {
-  display: none;
-}
-
-.card {
-  flex: 0 0 auto;
-  width: 90px;
-  scroll-snap-align: start;
-}
-
-.card img {
-  width: 90px;
-  height: 130px;
-  object-fit: cover;
-  border-radius: 6px;
-}
-</style>
-</head>
-
-<body>
-
-<h2>📚 蔵書アプリ</h2>
-
-<div id="scanPage" class="page active">
-
-  <button id="startBtn">カメラ起動</button>
-
-  <select id="location">
-    <option value="自宅">自宅</option>
-    <option value="実家">実家</option>
-  </select>
-
-  <select id="type">
-    <option value="商業誌">商業誌</option>
-    <option value="同人誌">同人誌</option>
-  </select>
-
-  <video id="video" autoplay playsinline></video>
-  <div id="result"></div>
-
-  <hr>
-
-  <h3>手動登録（ISBNなし）</h3>
-  <input id="manualTitle" placeholder="タイトル"><br>
-  <input id="manualAuthor" placeholder="著者"><br>
-  <button onclick="manualAdd()">登録</button>
-</div>
-
-<div id="shelfPage" class="page">
-
-  <div class="filter">
-    <select id="f_status">
-      <option value="all">すべて</option>
-      <option value="未読">未読</option>
-      <option value="読了">読了</option>
-    </select>
-
-    <select id="f_type">
-      <option value="all">すべて</option>
-      <option value="商業誌">商業誌</option>
-      <option value="同人誌">同人誌</option>
-    </select>
-
-    <select id="f_location">
-      <option value="all">すべて</option>
-      <option value="自宅">自宅</option>
-      <option value="実家">実家</option>
-    </select>
-  </div>
-
-  <div id="seriesGrid" class="grid"></div>
-</div>
-
-<div id="detailPage" class="page">
-  <button onclick="back()">← 戻る</button>
-  <div id="volumeList"></div>
-</div>
-
-<div class="tabbar">
-  <button onclick="show('scanPage')">📷</button>
-  <button onclick="show('shelfPage')">📚</button>
-</div>
-
-<script src="https://unpkg.com/@zxing/library@latest"></script>
-
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycby-xrf8gEb0AAVeHBpiykHl-Hfz-6cPGsyXakAg9EeymnnaD5E7V7H9XCyELwzZbuMD/exec";
 
 let books = [];
 let lastISBN = "";
 let lastTime = 0;
+
+/* ★追加 */
+let scannedBook = null;
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js");
@@ -287,7 +97,7 @@ async function send(p){
   loadBooks();
 }
 
-/* ✅ 修正済 */
+/* 手動登録（変更なし） */
 function manualAdd(){
   const loc = document.getElementById("location").value;
   const typ = document.getElementById("type").value;
@@ -301,7 +111,24 @@ function manualAdd(){
   });
 }
 
-/* ✅ 修正済 */
+/* ★追加：登録処理 */
+function registerScanned(){
+  if(!scannedBook) return;
+
+  const loc = document.getElementById("location").value;
+  const typ = document.getElementById("type").value;
+
+  send({
+    ...scannedBook,
+    location: loc,
+    type: typ
+  });
+
+  result.innerHTML = "登録しました！";
+  scannedBook = null;
+}
+
+/* ★修正：スキャン処理 */
 document.getElementById("startBtn").onclick=async()=>{
   const stream = await navigator.mediaDevices.getUserMedia({
     video:{facingMode:"environment"}
@@ -327,23 +154,23 @@ document.getElementById("startBtn").onclick=async()=>{
 
     if(!book)return;
 
-    result.textContent=book.title;
-
-    const loc = document.getElementById("location").value;
-    const typ = document.getElementById("type").value;
-
-    send({
+    /* ★ここが変更ポイント */
+    scannedBook = {
       isbn,
       title:book.title || "",
       author:book.authors?.join(",") || "",
       publisher:book.publisher || "",
-      thumbnail:book.imageLinks?.thumbnail || "",
-      location: loc,
-      type: typ
-    });
+      thumbnail:book.imageLinks?.thumbnail || ""
+    };
+
+    result.innerHTML = `
+      <div style="padding:10px">
+        <img src="${scannedBook.thumbnail}" style="width:80px"><br>
+        <b>${scannedBook.title}</b><br>
+        ${scannedBook.author || ""}<br><br>
+        <button onclick="registerScanned()">この内容で登録</button>
+      </div>
+    `;
   });
 };
 </script>
-
-</body>
-</html>
