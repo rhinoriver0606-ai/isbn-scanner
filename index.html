@@ -10,36 +10,30 @@ body {
   font-family: sans-serif;
   background: #f2f2f2;
   margin: 0;
-  padding: 10px;
+  padding-bottom: 60px; /* タブ分余白 */
 }
 
 h2 {
   text-align: center;
 }
 
+/* 画面切替 */
+.page {
+  display: none;
+  padding: 10px;
+}
+
+.page.active {
+  display: block;
+}
+
+/* カメラ */
 video {
   width: 100%;
   border-radius: 10px;
-  margin-bottom: 10px;
 }
 
-#result {
-  white-space: pre-line;
-  font-size: 14px;
-  color: green;
-}
-
-.controls {
-  display: flex;
-  gap: 10px;
-  margin: 10px 0;
-}
-
-#search {
-  flex: 1;
-  padding: 8px;
-}
-
+/* 本一覧カード */
 .card {
   background: white;
   border-radius: 12px;
@@ -51,11 +45,9 @@ video {
 
 .card img {
   width: 80px;
-  object-fit: cover;
 }
 
 .card-body {
-  flex: 1;
   padding: 10px;
 }
 
@@ -68,15 +60,42 @@ video {
   color: #666;
 }
 
-.btns {
-  margin-top: 6px;
-  display: flex;
-  gap: 5px;
+/* 本棚グリッド */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
 }
 
-button {
-  font-size: 12px;
-  padding: 6px 10px;
+.book {
+  background: white;
+  border-radius: 8px;
+  padding: 5px;
+  text-align: center;
+}
+
+.book img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+/* 下タブ */
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: white;
+  display: flex;
+  border-top: 1px solid #ccc;
+}
+
+.tabbar button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: none;
+  font-size: 14px;
 }
 </style>
 </head>
@@ -85,30 +104,23 @@ button {
 
 <h2>📚 蔵書アプリ</h2>
 
-<!-- 🔥 追加：本棚ボタン -->
-<div style="text-align:center; margin:10px;">
-  <button onclick="location.href='index2.html'">
-    📚 本棚を見る
-  </button>
+<!-- 📷 スキャン画面 -->
+<div id="scanPage" class="page active">
+  <button id="startBtn">カメラ起動</button>
+  <video id="video" autoplay playsinline></video>
+  <div id="result"></div>
 </div>
 
-<button id="startBtn">カメラ起動</button>
-<video id="video" autoplay playsinline></video>
-
-<div id="result"></div>
-
-<hr>
-
-<div class="controls">
-  <input id="search" placeholder="検索（タイトル・著者）">
-  <select id="filter">
-    <option value="all">すべて</option>
-    <option value="未読">未読</option>
-    <option value="読了">読了</option>
-  </select>
+<!-- 📚 本棚画面 -->
+<div id="shelfPage" class="page">
+  <div id="shelf" class="grid"></div>
 </div>
 
-<div id="list"></div>
+<!-- 🔥 下タブ -->
+<div class="tabbar">
+  <button onclick="showPage('scanPage')">📷 スキャン</button>
+  <button onclick="showPage('shelfPage')">📚 本棚</button>
+</div>
 
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 
@@ -119,7 +131,15 @@ let lastISBN = "";
 let lastTime = 0;
 let books = [];
 
-// 📚 書籍API
+// 🔄 画面切替
+function showPage(id) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+
+  if (id === "shelfPage") loadBooks();
+}
+
+// 📚 書籍取得
 async function fetchBookInfo(isbn) {
   const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
   const data = await res.json();
@@ -139,97 +159,27 @@ async function fetchBookInfo(isbn) {
 async function sendToSheet(p) {
   await fetch(GAS_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-    },
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
     body: new URLSearchParams(p)
   });
-
-  loadBooks();
 }
 
-// 📥 一覧取得
+// 📥 取得
 async function loadBooks() {
   const res = await fetch(GAS_URL);
   books = await res.json();
 
-  books.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  applyFilter();
+  renderShelf();
 }
 
-// 🧱 描画
-function render(data) {
-  document.getElementById("list").innerHTML = data.map(b => `
-    <div class="card">
-      <img src="${b.thumbnail || 'https://via.placeholder.com/80'}">
-      <div class="card-body">
-        <div class="title">${b.title}</div>
-        <div class="meta">著者: ${b.author}</div>
-        <div class="meta">出版社: ${b.publisher}</div>
-        <div class="meta">状態: ${b.status}</div>
-
-        <div class="btns">
-          <button onclick="toggleStatus('${b.id}')">読了切替</button>
-          <button onclick="deleteBook('${b.id}')">削除</button>
-        </div>
-      </div>
+// 📚 本棚描画
+function renderShelf() {
+  document.getElementById("shelf").innerHTML = books.map(b => `
+    <div class="book">
+      <img src="${b.thumbnail || 'https://via.placeholder.com/100x140'}">
+      <div class="title">${b.title}</div>
     </div>
   `).join("");
-}
-
-// 🔍 フィルタ
-function applyFilter() {
-  const q = document.getElementById("search").value.toLowerCase();
-  const f = document.getElementById("filter").value;
-
-  const filtered = books.filter(b => {
-    const textMatch =
-      (b.title || "").toLowerCase().includes(q) ||
-      (b.author || "").toLowerCase().includes(q);
-
-    const statusMatch =
-      f === "all" || b.status === f;
-
-    return textMatch && statusMatch;
-  });
-
-  render(filtered);
-}
-
-document.getElementById("search").addEventListener("input", applyFilter);
-document.getElementById("filter").addEventListener("change", applyFilter);
-
-// 🔄 読了切替
-async function toggleStatus(id) {
-  await fetch(GAS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-    },
-    body: new URLSearchParams({
-      action: "toggle",
-      id: id
-    })
-  });
-
-  loadBooks();
-}
-
-// 🗑 削除
-async function deleteBook(id) {
-  await fetch(GAS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-    },
-    body: new URLSearchParams({
-      action: "delete",
-      id: id
-    })
-  });
-
-  loadBooks();
 }
 
 // 📡 カメラ
@@ -242,7 +192,7 @@ document.getElementById("startBtn").addEventListener("click", async () => {
 
   const reader = new ZXing.BrowserMultiFormatReader();
 
-  reader.decodeFromVideoDevice(null, document.getElementById("video"), async (res) => {
+  reader.decodeFromVideoDevice(null, video, async (res) => {
     if (!res) return;
 
     const isbn = res.getText();
@@ -252,8 +202,6 @@ document.getElementById("startBtn").addEventListener("click", async () => {
 
     lastISBN = isbn;
     lastTime = now;
-
-    document.getElementById("result").textContent = "取得中...";
 
     const book = await fetchBookInfo(isbn);
     if (!book) return;
@@ -269,8 +217,6 @@ document.getElementById("startBtn").addEventListener("click", async () => {
     });
   });
 });
-
-loadBooks();
 </script>
 
 </body>
