@@ -53,27 +53,29 @@
     let codeReader;
     let stream;
 
-    // 🔥 あなたのGAS URL
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxA4YkexgRVFM6hKhtnv986eeyXHEMZkOyBK86Vli8yxPoJNl_fz7D-G8IbRb1PGjSKJg/exec";
 
-    // スプレッドシート送信
-async function sendToSheet(isbn) {
-  try {
-    const formData = new URLSearchParams();
-    formData.append("isbn", isbn);
+    // 🔥 重複防止用
+    let lastISBN = "";
+    let lastTime = 0;
 
-    const res = await fetch(GAS_URL, {
-      method: "POST",
-      body: formData
-    });
+    async function sendToSheet(isbn) {
+      try {
+        const formData = new URLSearchParams();
+        formData.append("isbn", isbn);
 
-    const text = await res.text();
-    console.log("GASレスポンス:", text);
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          body: formData
+        });
 
-  } catch (err) {
-    console.error("送信失敗:", err);
-  }
-}
+        const text = await res.text();
+        console.log("GASレスポンス:", text);
+
+      } catch (err) {
+        console.error("送信失敗:", err);
+      }
+    }
 
     startBtn.addEventListener('click', async () => {
       try {
@@ -91,9 +93,18 @@ async function sendToSheet(isbn) {
           (res, err) => {
             if (res) {
               const isbn = res.getText();
-              result.textContent = "ISBN: " + isbn;
 
-              sendToSheet(isbn);
+              const now = Date.now();
+
+              // 🔥 重複防止ロジック
+              if (isbn !== lastISBN || now - lastTime > 3000) {
+                lastISBN = isbn;
+                lastTime = now;
+
+                result.textContent = "ISBN: " + isbn;
+
+                sendToSheet(isbn);
+              }
             }
           }
         );
@@ -103,12 +114,6 @@ async function sendToSheet(isbn) {
         console.error(err);
       }
     });
-
-    // 🔥 3秒後にテスト送信（重要）
-    setTimeout(() => {
-      sendToSheet("TEST_ISBN_123");
-    }, 3000);
-
   </script>
 </body>
 </html>
