@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>蔵書アプリ</title>
+<title>シリーズ本棚</title>
 
 <style>
 body {
@@ -19,266 +19,180 @@ h2 {
   padding: 10px;
 }
 
-.page { display: none; padding: 10px; }
-.page.active { display: block; }
-
-video {
-  width: 100%;
-  border-radius: 10px;
-}
-
-/* 本棚 */
-.shelf {
+/* ===== 1階層（シリーズ一覧） ===== */
+.grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 10px;
 }
 
-.book {
+.series-card {
   background: #1e1e1e;
-  border-radius: 6px;
-  padding: 6px;
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
   text-align: center;
 }
 
-.book img {
+.series-title {
+  font-weight: bold;
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+.count {
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* 表紙 */
+.series-cover {
   width: 100%;
   height: 140px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* ===== 2階層（巻一覧） ===== */
+.back {
+  padding: 10px;
+  background: #222;
+  cursor: pointer;
+  text-align: center;
+}
+
+.volumes {
+  padding: 10px;
+}
+
+.volume {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.volume img {
+  width: 50px;
+  height: 70px;
   object-fit: cover;
   border-radius: 4px;
 }
 
-.title {
-  font-size: 11px;
-  margin-top: 5px;
-  color: #ddd;
+.meta {
+  font-size: 12px;
+  color: #ccc;
 }
 
-.status {
-  font-size: 10px;
-  color: #aaa;
+/* 非表示制御 */
+.page {
+  display: none;
 }
 
-.done { color: #4caf50; }
-
-.tabbar {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  display: flex;
-  background: #222;
-}
-
-.tabbar button {
-  flex: 1;
-  padding: 10px;
-  background: none;
-  border: none;
-  color: white;
+.page.active {
+  display: block;
 }
 </style>
 </head>
 
 <body>
 
-<h2>📚 蔵書アプリ</h2>
+<h2>📚 シリーズ本棚</h2>
 
-<!-- スキャン -->
-<div id="scanPage" class="page active">
-
-  <button id="startBtn">カメラ起動</button>
-
-  <!-- 場所 -->
-  <select id="location">
-    <option value="自宅">自宅</option>
-    <option value="実家">実家</option>
-  </select>
-
-  <!-- 種別（追加） -->
-  <select id="type">
-    <option value="商業誌">商業誌</option>
-    <option value="同人誌">同人誌</option>
-  </select>
-
-  <video id="video" autoplay playsinline></video>
-  <div id="result"></div>
-
-  <hr>
-
-  <h3>✍ ISBNなし登録</h3>
-  <input id="manualTitle" placeholder="タイトル"><br>
-  <input id="manualAuthor" placeholder="著者"><br>
-  <button onclick="manualAdd()">登録</button>
-
+<!-- 1階層 -->
+<div id="homePage" class="page active">
+  <div id="seriesGrid" class="grid"></div>
 </div>
 
-<!-- 本棚 -->
-<div id="shelfPage" class="page">
-
-  <select id="filterStatus">
-    <option value="all">すべて</option>
-    <option value="未読">未読</option>
-    <option value="読了">読了</option>
-  </select>
-
-  <select id="filterLocation">
-    <option value="all">すべて</option>
-    <option value="自宅">自宅</option>
-    <option value="実家">実家</option>
-  </select>
-
-  <!-- 種別フィルター（追加） -->
-  <select id="filterType">
-    <option value="all">すべて</option>
-    <option value="商業誌">商業誌</option>
-    <option value="同人誌">同人誌</option>
-  </select>
-
-  <div id="shelf" class="shelf"></div>
+<!-- 2階層 -->
+<div id="detailPage" class="page">
+  <div class="back" onclick="back()">← 戻る</div>
+  <div id="volumeList" class="volumes"></div>
 </div>
-
-<!-- タブ -->
-<div class="tabbar">
-  <button onclick="showPage('scanPage')">📷</button>
-  <button onclick="showPage('shelfPage')">📚</button>
-</div>
-
-<script src="https://unpkg.com/@zxing/library@latest"></script>
 
 <script>
-
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxulcJMiF65Dw9_dftVUUdk3tdGllap7EnaGFsWZ2N8lyy48BmM2AuurdC3f2LcnJr1gQ/exec";
 
-let lastISBN = "";
-let lastTime = 0;
 let books = [];
 
-/* 画面切替 */
-function showPage(id) {
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
-  if (id === "shelfPage") loadBooks();
-}
-
-/* ISBN取得 */
-async function fetchBookInfo(isbn) {
-  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-  const data = await res.json();
-  if (!data.items) return null;
-
-  const v = data.items[0].volumeInfo;
-
-  return {
-    title: v.title || "",
-    author: (v.authors || []).join(", "),
-    publisher: v.publisher || "",
-    thumbnail: v.imageLinks?.thumbnail || ""
-  };
-}
-
-/* 保存 */
-async function sendToSheet(p) {
-  await fetch(GAS_URL, {
-    method: "POST",
-    headers: {"Content-Type":"application/x-www-form-urlencoded"},
-    body: new URLSearchParams(p)
-  });
-  loadBooks();
-}
-
-/* 手動登録 */
-async function manualAdd() {
-  await sendToSheet({
-    isbn: "",
-    title: document.getElementById("manualTitle").value,
-    author: document.getElementById("manualAuthor").value,
-    publisher: "",
-    thumbnail: "",
-    location: document.getElementById("location").value,
-    type: document.getElementById("type").value
-  });
-}
-
-/* 取得 */
+/* データ取得 */
 async function loadBooks() {
   const res = await fetch(GAS_URL);
   books = await res.json();
-  render();
+
+  renderSeries();
 }
 
-/* 描画 */
-function render() {
+/* シリーズごとにまとめる */
+function groupBySeries(data) {
+  const map = {};
 
-  const status = document.getElementById("filterStatus").value;
-  const loc = document.getElementById("filterLocation").value;
-  const type = document.getElementById("filterType").value;
+  data.forEach(b => {
+    const key = (b.series && b.series.trim() !== "")
+      ? b.series
+      : "その他";
 
-  const filtered = books.filter(b => {
-
-    const okStatus = status === "all" || b.status === status;
-    const okLoc = loc === "all" || b.location === loc;
-    const okType = type === "all" || b.type === type;
-
-    return okStatus && okLoc && okType;
+    if (!map[key]) map[key] = [];
+    map[key].push(b);
   });
 
-  document.getElementById("shelf").innerHTML =
-    filtered.map(b => `
-      <div class="book">
-        <img src="${b.thumbnail || 'https://via.placeholder.com/100x140'}">
-        <div class="title">${b.title || "無題"}</div>
-        <div class="status ${b.status === "読了" ? "done" : ""}">
-          ${b.status || "未読"}
+  return map;
+}
+
+/* 巻順ソート */
+function sortVolume(a, b) {
+  return Number(a.volume || 0) - Number(b.volume || 0);
+}
+
+/* 1階層表示 */
+function renderSeries() {
+  const grouped = groupBySeries(books);
+
+  document.getElementById("seriesGrid").innerHTML =
+    Object.keys(grouped).map(series => {
+
+      const items = grouped[series];
+
+      return `
+        <div class="series-card" onclick="openSeries('${series}')">
+          <img class="series-cover" src="${items[0].thumbnail || 'https://via.placeholder.com/200x300'}">
+          <div class="series-title">${series}</div>
+          <div class="count">${items.length}冊</div>
+        </div>
+      `;
+    }).join("");
+}
+
+/* 2階層表示 */
+function openSeries(series) {
+  const items = books
+    .filter(b => b.series === series)
+    .sort(sortVolume);
+
+  document.getElementById("volumeList").innerHTML =
+    items.map(b => `
+      <div class="volume">
+        <img src="${b.thumbnail || 'https://via.placeholder.com/50x70'}">
+        <div class="meta">
+          ${b.volume ? b.volume + "巻" : ""}<br>
+          ${b.title}
         </div>
       </div>
     `).join("");
+
+  document.getElementById("homePage").classList.remove("active");
+  document.getElementById("detailPage").classList.add("active");
 }
 
-/* フィルター */
-document.getElementById("filterStatus").addEventListener("change", render);
-document.getElementById("filterLocation").addEventListener("change", render);
-document.getElementById("filterType").addEventListener("change", render);
+/* 戻る */
+function back() {
+  document.getElementById("detailPage").classList.remove("active");
+  document.getElementById("homePage").classList.add("active");
+}
 
-/* カメラ */
-document.getElementById("startBtn").addEventListener("click", async () => {
-
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" }
-  });
-
-  const video = document.getElementById("video");
-  video.srcObject = stream;
-
-  const reader = new ZXing.BrowserMultiFormatReader();
-
-  reader.decodeFromVideoDevice(null, video, async (res) => {
-    if (!res) return;
-
-    const isbn = res.getText();
-    const now = Date.now();
-
-    if (isbn === lastISBN && now - lastTime < 5000) return;
-
-    lastISBN = isbn;
-    lastTime = now;
-
-    const book = await fetchBookInfo(isbn);
-    if (!book) return;
-
-    document.getElementById("result").textContent = book.title;
-
-    await sendToSheet({
-      isbn,
-      title: book.title,
-      author: book.author,
-      publisher: book.publisher,
-      thumbnail: book.thumbnail,
-      location: document.getElementById("location").value,
-      type: document.getElementById("type").value
-    });
-  });
-});
-
+/* 起動 */
+loadBooks();
 </script>
 
 </body>
