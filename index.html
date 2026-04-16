@@ -106,7 +106,7 @@ async function sendToSheet(payload) {
 
         const now = Date.now();
 
-        if (isbn === lastISBN && now - lastTime < 3000) return;
+        if (isbn === lastISBN && now - lastTime < 5000) return;
 
         lastISBN = isbn;
         lastTime = now;
