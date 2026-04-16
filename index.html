@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>シリーズ本棚</title>
+<title>蔵書アプリ（統合版）</title>
 
 <style>
 body {
@@ -11,20 +11,42 @@ body {
   background: #111;
   color: white;
   margin: 0;
-  padding-bottom: 60px;
+  padding-bottom: 70px;
 }
 
+/* ===== ヘッダー ===== */
 h2 {
   text-align: center;
   padding: 10px;
 }
 
-/* ===== 1階層（シリーズ一覧） ===== */
+/* ===== 画面切替 ===== */
+.page { display: none; padding: 10px; }
+.page.active { display: block; }
+
+/* ===== カメラ ===== */
+video {
+  width: 100%;
+  border-radius: 10px;
+}
+
+/* ===== フィルター ===== */
+.filter {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+select {
+  padding: 5px;
+}
+
+/* ===== 本棚（シリーズ） ===== */
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
-  padding: 10px;
 }
 
 .series-card {
@@ -35,42 +57,24 @@ h2 {
   text-align: center;
 }
 
-.series-title {
-  font-weight: bold;
-  margin-top: 5px;
-  font-size: 14px;
-}
-
-.count {
-  font-size: 12px;
-  color: #aaa;
-}
-
-/* 表紙 */
-.series-cover {
+.series-card img {
   width: 100%;
   height: 140px;
   object-fit: cover;
   border-radius: 6px;
 }
 
-/* ===== 2階層（巻一覧） ===== */
-.back {
-  padding: 10px;
-  background: #222;
-  cursor: pointer;
-  text-align: center;
+.series-title {
+  font-weight: bold;
+  font-size: 13px;
+  margin-top: 5px;
 }
 
-.volumes {
-  padding: 10px;
-}
-
+/* ===== 巻一覧 ===== */
 .volume {
   display: flex;
   gap: 10px;
   margin-bottom: 10px;
-  align-items: center;
 }
 
 .volume img {
@@ -80,119 +84,256 @@ h2 {
   border-radius: 4px;
 }
 
-.meta {
-  font-size: 12px;
-  color: #ccc;
+/* ===== タブ ===== */
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  background: #222;
 }
 
-/* 非表示制御 */
-.page {
-  display: none;
-}
-
-.page.active {
-  display: block;
+.tabbar button {
+  flex: 1;
+  padding: 12px;
+  background: none;
+  border: none;
+  color: white;
 }
 </style>
 </head>
 
 <body>
 
-<h2>📚 シリーズ本棚</h2>
+<h2>📚 蔵書アプリ</h2>
 
-<!-- 1階層 -->
-<div id="homePage" class="page active">
+<!-- ======================
+📷 スキャン画面
+====================== -->
+<div id="scanPage" class="page active">
+
+  <button id="startBtn">カメラ起動</button>
+
+  <select id="location">
+    <option value="自宅">自宅</option>
+    <option value="実家">実家</option>
+  </select>
+
+  <select id="type">
+    <option value="商業誌">商業誌</option>
+    <option value="同人誌">同人誌</option>
+  </select>
+
+  <video id="video" autoplay playsinline></video>
+  <div id="result"></div>
+
+  <hr>
+
+  <h3>手動登録</h3>
+  <input id="manualTitle" placeholder="タイトル">
+  <input id="manualAuthor" placeholder="著者">
+  <button onclick="manualAdd()">登録</button>
+</div>
+
+<!-- ======================
+📚 本棚（シリーズ）
+====================== -->
+<div id="shelfPage" class="page">
+
+  <!-- フィルター復活 -->
+  <div class="filter">
+    <select id="f_status">
+      <option value="all">すべて</option>
+      <option value="未読">未読</option>
+      <option value="読了">読了</option>
+    </select>
+
+    <select id="f_type">
+      <option value="all">すべて</option>
+      <option value="商業誌">商業誌</option>
+      <option value="同人誌">同人誌</option>
+    </select>
+
+    <select id="f_location">
+      <option value="all">すべて</option>
+      <option value="自宅">自宅</option>
+      <option value="実家">実家</option>
+    </select>
+  </div>
+
   <div id="seriesGrid" class="grid"></div>
 </div>
 
-<!-- 2階層 -->
+<!-- ======================
+📖 巻詳細
+====================== -->
 <div id="detailPage" class="page">
-  <div class="back" onclick="back()">← 戻る</div>
-  <div id="volumeList" class="volumes"></div>
+  <button onclick="back()">← 戻る</button>
+  <div id="volumeList"></div>
 </div>
 
+<!-- タブ -->
+<div class="tabbar">
+  <button onclick="show('scanPage')">📷</button>
+  <button onclick="show('shelfPage')">📚</button>
+</div>
+
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+
 <script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwNY_HLbY0FQ54v-Sz1sRNz4k28qltCgL19-4fwcaKQL94pPy7kAs9MtC6PBn3OFTOyZw/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxulcJMiF65Dw9_dftVUUdk3tdGllap7EnaGFsWZ2N8lyy48BmM2AuurdC3f2LcnJr1gQ/exec";
 
 let books = [];
+let lastISBN = "";
+let lastTime = 0;
 
-/* データ取得 */
-async function loadBooks() {
+/* ======================
+画面切替
+====================== */
+function show(id){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+
+  if(id==="shelfPage") loadBooks();
+}
+
+/* ======================
+データ取得
+====================== */
+async function loadBooks(){
   const res = await fetch(GAS_URL);
   books = await res.json();
-
   renderSeries();
 }
 
-/* シリーズごとにまとめる */
-function groupBySeries(data) {
+/* ======================
+フィルター
+====================== */
+function getFiltered(){
+  const s = document.getElementById("f_status").value;
+  const t = document.getElementById("f_type").value;
+  const l = document.getElementById("f_location").value;
+
+  return books.filter(b =>
+    (s==="all"||b.status===s) &&
+    (t==="all"||b.type===t) &&
+    (l==="all"||b.location===l)
+  );
+}
+
+/* ======================
+シリーズまとめ
+====================== */
+function renderSeries(){
+  const data = getFiltered();
+
   const map = {};
-
-  data.forEach(b => {
-    const key = (b.series && b.series.trim() !== "")
-      ? b.series
-      : "その他";
-
-    if (!map[key]) map[key] = [];
+  data.forEach(b=>{
+    const key = b.series?.trim() || "その他";
+    if(!map[key]) map[key]=[];
     map[key].push(b);
   });
 
-  return map;
-}
-
-/* 巻順ソート */
-function sortVolume(a, b) {
-  return Number(a.volume || 0) - Number(b.volume || 0);
-}
-
-/* 1階層表示 */
-function renderSeries() {
-  const grouped = groupBySeries(books);
-
   document.getElementById("seriesGrid").innerHTML =
-    Object.keys(grouped).map(series => {
-
-      const items = grouped[series];
-
+    Object.keys(map).map(k=>{
+      const items = map[k];
       return `
-        <div class="series-card" onclick="openSeries('${series}')">
-          <img class="series-cover" src="${items[0].thumbnail || 'https://via.placeholder.com/200x300'}">
-          <div class="series-title">${series}</div>
-          <div class="count">${items.length}冊</div>
+        <div class="series-card" onclick="openSeries('${k}')">
+          <img src="${items[0].thumbnail || 'https://via.placeholder.com/200'}">
+          <div class="series-title">${k}</div>
         </div>
       `;
     }).join("");
 }
 
-/* 2階層表示 */
-function openSeries(series) {
+/* ======================
+巻表示
+====================== */
+function openSeries(series){
   const items = books
-    .filter(b => b.series === series)
-    .sort(sortVolume);
+    .filter(b=>b.series===series)
+    .sort((a,b)=>Number(a.volume)-Number(b.volume));
 
   document.getElementById("volumeList").innerHTML =
-    items.map(b => `
+    items.map(b=>`
       <div class="volume">
-        <img src="${b.thumbnail || 'https://via.placeholder.com/50x70'}">
-        <div class="meta">
-          ${b.volume ? b.volume + "巻" : ""}<br>
-          ${b.title}
-        </div>
+        <img src="${b.thumbnail || ''}">
+        <div>${b.volume||""}巻 ${b.title}</div>
       </div>
     `).join("");
 
-  document.getElementById("homePage").classList.remove("active");
-  document.getElementById("detailPage").classList.add("active");
+  show("detailPage");
 }
 
-/* 戻る */
-function back() {
-  document.getElementById("detailPage").classList.remove("active");
-  document.getElementById("homePage").classList.add("active");
+/* ======================
+戻る
+====================== */
+function back(){
+  show("shelfPage");
 }
 
-/* 起動 */
-loadBooks();
+/* ======================
+登録
+====================== */
+async function send(p){
+  await fetch(GAS_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams(p)
+  });
+  loadBooks();
+}
+
+/* 手動 */
+function manualAdd(){
+  send({
+    title:manualTitle.value,
+    author:manualAuthor.value,
+    location:location.value,
+    type:type.value,
+    isbn:""
+  });
+}
+
+/* ======================
+カメラ
+====================== */
+document.getElementById("startBtn").onclick=async()=>{
+  const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+  video.srcObject = stream;
+
+  const reader = new ZXing.BrowserMultiFormatReader();
+
+  reader.decodeFromVideoDevice(null,video,async(res)=>{
+    if(!res)return;
+
+    const isbn=res.getText();
+    const now=Date.now();
+    if(isbn===lastISBN&&now-lastTime<5000)return;
+
+    lastISBN=isbn;
+    lastTime=now;
+
+    const book=await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`)
+      .then(r=>r.json())
+      .then(d=>d.items?.[0]?.volumeInfo);
+
+    if(!book)return;
+
+    result.textContent=book.title;
+
+    send({
+      isbn,
+      title:book.title,
+      author:book.authors?.join(","),
+      publisher:book.publisher,
+      thumbnail:book.imageLinks?.thumbnail,
+      location:location.value,
+      type:type.value
+    });
+  });
+};
+
 </script>
 
 </body>
