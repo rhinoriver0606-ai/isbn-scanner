@@ -35,12 +35,6 @@
 </head>
 
 <body>
-
-setTimeout(() => {
-  sendToSheet("TEST_ISBN_123");
-}, 3000);
-
-  
   <h2>ISBNバーコードスキャナー</h2>
 
   <button id="startBtn">カメラ起動</button>
@@ -49,7 +43,6 @@ setTimeout(() => {
 
   <div id="result">未スキャン</div>
 
-  <!-- ZXing -->
   <script src="https://unpkg.com/@zxing/library@latest"></script>
 
   <script>
@@ -60,13 +53,13 @@ setTimeout(() => {
     let codeReader;
     let stream;
 
-    // 🔥 ここを自分のGAS URLに変更
+    // 🔥 あなたのGAS URL
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzmnsy8fdjto6UvilZDQWYQNRxbo7IkVmbKzBTG8ZZ8LSm2t3BQZ5Kk3QyxhJ2_Md-MWA/exec";
 
-    // スプレッドシートへ送信
+    // スプレッドシート送信
     async function sendToSheet(isbn) {
       try {
-        await fetch(GAS_URL, {
+        const res = await fetch(GAS_URL, {
           method: "POST",
           body: JSON.stringify({ isbn }),
           headers: {
@@ -74,7 +67,9 @@ setTimeout(() => {
           }
         });
 
-        console.log("送信成功:", isbn);
+        const text = await res.text();
+        console.log("GASレスポンス:", text);
+
       } catch (err) {
         console.error("送信失敗:", err);
       }
@@ -82,16 +77,12 @@ setTimeout(() => {
 
     startBtn.addEventListener('click', async () => {
       try {
-        // カメラ起動
         stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "environment"
-          }
+          video: { facingMode: "environment" }
         });
 
         video.srcObject = stream;
 
-        // ZXing開始
         codeReader = new ZXing.BrowserMultiFormatReader();
 
         codeReader.decodeFromVideoDevice(
@@ -100,15 +91,9 @@ setTimeout(() => {
           (res, err) => {
             if (res) {
               const isbn = res.getText();
-
               result.textContent = "ISBN: " + isbn;
 
-              // 🔥 スプレッドシートへ送信
               sendToSheet(isbn);
-            }
-
-            if (err && !(err instanceof ZXing.NotFoundException)) {
-              console.error(err);
             }
           }
         );
@@ -118,6 +103,12 @@ setTimeout(() => {
         console.error(err);
       }
     });
+
+    // 🔥 3秒後にテスト送信（重要）
+    setTimeout(() => {
+      sendToSheet("TEST_ISBN_123");
+    }, 3000);
+
   </script>
 </body>
 </html>
