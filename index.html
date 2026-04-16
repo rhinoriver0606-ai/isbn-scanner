@@ -86,7 +86,7 @@ button {
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 
 <script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxvHr7_PeJBPEUOzEzrSpMuBOC70siewwsy4Nz4thJKi-DTcMmR606Kj92IFDeii6sZ0w/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzKEixqLCDCHO4FWRw-2mvtNIRGZR93-NIWnxvQZCAnfR5DNeNxTslwXjAGPLcOvHn4Cg/exec";
 
 let lastISBN = "";
 let lastTime = 0;
@@ -143,10 +143,10 @@ function render(data) {
         <div class="meta">状態: ${b.status}</div>
 
         <div class="btns">
-          <button onclick="toggleStatus(${b.id}, '${b.status}')">
+          <button onclick="toggleStatus('${b.id}')">
             読了切替
           </button>
-          <button onclick="deleteBook(${b.id})">
+          <button onclick="deleteBook('${b.id}')">
             削除
           </button>
         </div>
@@ -156,12 +156,11 @@ function render(data) {
 }
 
 // 🔄 読了切替
-async function toggleStatus(id, status) {
+async function toggleStatus(id) {
   await fetch(GAS_URL + "?action=toggle&id=" + id);
   loadBooks();
 }
 
-// 🗑 削除
 async function deleteBook(id) {
   await fetch(GAS_URL + "?action=delete&id=" + id);
   loadBooks();
