@@ -1,10 +1,12 @@
 {
   "name": "蔵書アプリ",
-  "short_name": "Books",
-  "start_url": ".",
+  "short_name": "本棚",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#111111",
   "theme_color": "#111111",
+  "description": "シリーズ管理できる蔵書アプリ",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "icon-192.png",
