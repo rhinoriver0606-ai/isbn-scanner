@@ -24,11 +24,11 @@
     }
 
     /* 🔥 本棚グリッド */
-    #list {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-      gap: 10px;
-    }
+#list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 10px;
+}
 
     .book {
       background: white;
@@ -38,12 +38,10 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
-    .book img {
-      width: 100%;
-      height: 140px;
-      object-fit: cover;
-      border-radius: 4px;
-    }
+.book img {
+  height: 120px;
+  object-fit: cover;
+}
 
     .title {
       font-size: 12px;
