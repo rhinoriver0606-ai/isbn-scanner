@@ -1,65 +1,73 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>蔵書アプリ</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>蔵書アプリ</title>
 
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 10px;
-      background: #f5f5f5;
-    }
+<style>
+body {
+  font-family: sans-serif;
+  background: #f2f2f2;
+  margin: 0;
+  padding: 10px;
+}
 
-    h2 {
-      text-align: center;
-    }
+h2 {
+  text-align: center;
+}
 
-    video {
-      width: 100%;
-      max-width: 400px;
-      border: 1px solid #ccc;
-      margin-bottom: 10px;
-    }
+video {
+  width: 100%;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
 
-    #result {
-      font-size: 14px;
-      color: green;
-      margin-bottom: 10px;
-      white-space: pre-line;
-    }
+#result {
+  white-space: pre-line;
+  font-size: 14px;
+  color: green;
+}
 
-    #search {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      margin: 10px 0;
-    }
+.card {
+  background: white;
+  border-radius: 12px;
+  margin: 10px 0;
+  display: flex;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
 
-    .book {
-      background: white;
-      padding: 10px;
-      margin-bottom: 10px;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
+.card img {
+  width: 80px;
+  object-fit: cover;
+}
 
-    .title {
-      font-weight: bold;
-      font-size: 16px;
-    }
+.card-body {
+  flex: 1;
+  padding: 10px;
+}
 
-    .meta {
-      font-size: 13px;
-      color: #555;
-    }
+.title {
+  font-weight: bold;
+}
 
-    .isbn {
-      font-size: 11px;
-      color: #888;
-    }
-  </style>
+.meta {
+  font-size: 12px;
+  color: #666;
+}
+
+.btns {
+  margin-top: 6px;
+  display: flex;
+  gap: 5px;
+}
+
+button {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+</style>
 </head>
 
 <body>
@@ -69,138 +77,134 @@
 <button id="startBtn">カメラ起動</button>
 <video id="video" autoplay playsinline></video>
 
-<div id="result">未スキャン</div>
+<div id="result"></div>
 
-<input id="search" placeholder="タイトル・著者で検索">
+<hr>
 
-<div id="list">読み込み中...</div>
+<div id="list"></div>
 
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 
 <script>
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbzpE20JNCVBfuW0KNBYJck4ZUfCd-i8pJhzAN95wwj9iCRR3eBGxRMxMAoXhcQL0Bpigg/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyGY7-Mh8QKw4FYBIYllCCc2leTID6A_dGYXasily2zS7ubopDNUnKLYCaQWYP1U7ndTQ/exec";
 
-  const startBtn = document.getElementById("startBtn");
-  const video = document.getElementById("video");
-  const result = document.getElementById("result");
-  const listEl = document.getElementById("list");
+let lastISBN = "";
+let lastTime = 0;
 
-  let books = [];
-  let lastISBN = "";
-  let lastTime = 0;
+// 📘 表紙取得
+function getCover(isbn) {
+  return `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
+}
 
-  // -----------------------------
-  // 書籍取得
-  // -----------------------------
-  async function fetchBookInfo(isbn) {
-    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`;
-    const res = await fetch(url);
-    const data = await res.json();
+// 📚 書籍API
+async function fetchBookInfo(isbn) {
+  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+  const data = await res.json();
+  if (!data.items) return null;
 
-    if (!data.items) return null;
+  const v = data.items[0].volumeInfo;
 
-    const info = data.items[0].volumeInfo;
+  return {
+    title: v.title || "",
+    author: (v.authors || []).join(", "),
+    publisher: v.publisher || ""
+  };
+}
 
-    return {
-      title: info.title || "",
-      author: (info.authors || []).join(", "),
-      publisher: info.publisher || ""
-    };
-  }
-
-  // -----------------------------
-  // GAS送信
-  // -----------------------------
-  async function sendToSheet(payload) {
-    await fetch(GAS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-      },
-      body: new URLSearchParams(payload).toString()
-    });
-
-    loadBooks(); // 🔥 送信後に再読み込み
-  }
-
-  // -----------------------------
-  // 一覧取得
-  // -----------------------------
-  async function loadBooks() {
-    const res = await fetch(GAS_URL);
-    books = await res.json();
-    render(books);
-  }
-
-  function render(data) {
-    listEl.innerHTML = data.map(b => `
-      <div class="book">
-        <div class="title">${b.title || "（タイトルなし）"}</div>
-        <div class="meta">著者: ${b.author || "-"}</div>
-        <div class="meta">出版社: ${b.publisher || "-"}</div>
-        <div class="isbn">ISBN: ${b.isbn}</div>
-      </div>
-    `).join("");
-  }
-
-  document.getElementById("search").addEventListener("input", e => {
-    const q = e.target.value.toLowerCase();
-    render(books.filter(b =>
-      (b.title || "").toLowerCase().includes(q) ||
-      (b.author || "").toLowerCase().includes(q)
-    ));
+// 📤 保存
+async function sendToSheet(p) {
+  await fetch(GAS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+    },
+    body: new URLSearchParams(p)
   });
 
-  // -----------------------------
-  // カメラ
-  // -----------------------------
-  startBtn.addEventListener("click", async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
-    });
-
-    video.srcObject = stream;
-
-    const codeReader = new ZXing.BrowserMultiFormatReader();
-
-    codeReader.decodeFromVideoDevice(null, video, async (res) => {
-      if (!res) return;
-
-      const isbn = res.getText();
-      const now = Date.now();
-
-      // 5秒重複防止
-      if (isbn === lastISBN && now - lastTime < 5000) return;
-
-      lastISBN = isbn;
-      lastTime = now;
-
-      result.textContent = "ISBN: " + isbn + "\n取得中...";
-
-      const book = await fetchBookInfo(isbn);
-
-      if (!book) {
-        result.textContent = "書籍情報なし";
-        return;
-      }
-
-      result.textContent =
-        `ISBN: ${isbn}\n` +
-        `タイトル: ${book.title}\n` +
-        `著者: ${book.author}\n` +
-        `出版社: ${book.publisher}`;
-
-      await sendToSheet({
-        isbn,
-        title: book.title,
-        author: book.author,
-        publisher: book.publisher
-      });
-    });
-  });
-
-  // 初回ロード
   loadBooks();
+}
+
+// 📥 一覧取得
+async function loadBooks() {
+  const res = await fetch(GAS_URL);
+  const data = await res.json();
+  render(data);
+}
+
+// 🧱 描画
+function render(data) {
+  document.getElementById("list").innerHTML = data.map(b => `
+    <div class="card">
+      <img src="${getCover(b.isbn)}" onerror="this.src='https://via.placeholder.com/80'">
+      <div class="card-body">
+        <div class="title">${b.title}</div>
+        <div class="meta">著者: ${b.author}</div>
+        <div class="meta">出版社: ${b.publisher}</div>
+        <div class="meta">状態: ${b.status}</div>
+
+        <div class="btns">
+          <button onclick="toggleStatus(${b.id}, '${b.status}')">
+            読了切替
+          </button>
+          <button onclick="deleteBook(${b.id})">
+            削除
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+// 🔄 読了切替
+async function toggleStatus(id, status) {
+  await fetch(GAS_URL + "?action=toggle&id=" + id);
+  loadBooks();
+}
+
+// 🗑 削除
+async function deleteBook(id) {
+  await fetch(GAS_URL + "?action=delete&id=" + id);
+  loadBooks();
+}
+
+// 📡 カメラ
+document.getElementById("startBtn").addEventListener("click", async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  });
+
+  document.getElementById("video").srcObject = stream;
+
+  const reader = new ZXing.BrowserMultiFormatReader();
+
+  reader.decodeFromVideoDevice(null, document.getElementById("video"), async (res) => {
+    if (!res) return;
+
+    const isbn = res.getText();
+    const now = Date.now();
+
+    if (isbn === lastISBN && now - lastTime < 5000) return;
+
+    lastISBN = isbn;
+    lastTime = now;
+
+    document.getElementById("result").textContent = "取得中...";
+
+    const book = await fetchBookInfo(isbn);
+    if (!book) return;
+
+    document.getElementById("result").textContent = book.title;
+
+    await sendToSheet({
+      isbn,
+      title: book.title,
+      author: book.author,
+      publisher: book.publisher
+    });
+  });
+});
+
+loadBooks();
 </script>
 
 </body>
