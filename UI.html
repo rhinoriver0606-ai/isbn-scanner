@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4285F4">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>蔵書管理アプリ</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%234285F4' width='192' height='192'/><text x='50%' y='50%' font-size='120' fill='white' text-anchor='middle' dominant-baseline='middle' font-weight='bold'>📚</text></svg>">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #4285F4;
+            --secondary-color: #34A853;
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-primary: #202124;
+            --text-secondary: #5f6368;
+            --border-color: #dadce0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ヘッダー */
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        /* メインコンテンツ */
+        main {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 初期化セクション */
+        .init-section {
+            padding: 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .init-section h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            font-size: 14px;
+            text-align: left;
+        }
+
+        .form-group input {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        /* タブナビゲーション */
+        .tab-navigation {
+            display: flex;
+            background-color: white;
+            border-top: 1px solid var(--border-color);
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 60px;
+            z-index: 20;
+        }
+
+        .tab-button {
+            flex: 1;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: var(--text-secondary);
+            border-top: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: var(--primary-color);
+            border-top-color: var(--primary-color);
+        }
+
+        .tab-button span {
+            font-size: 24px;
+        }
+
+        /* コンテンツエリア */
+        .content {
+            flex: 1;
+            overflow: auto;
+            display: none;
+            padding-bottom: 60px;
+            margin-bottom: 60px;
+        }
+
+        .content.active {
+            display: block;
+        }
+
+        /* カメラセクション */
+        .camera-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 100%;
+        }
+
+        #scanner {
+            flex: 1;
+            background-color: #000;
+            position: relative;
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 300px;
+            aspect-ratio: 1;
+            border: 2px solid #00FF00;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
+        .scanner-info {
+            padding: 10px;
+            background-color: var(--card-bg);
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* 確認モーダル */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px;
+            max-width: 90%;
+            max-height: 80vh;
+            overflow: auto;
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .book-preview {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .book-preview img {
+            width: 80px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 4px;
+            background-color: var(--bg-color);
+        }
+
+        .book-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .book-info h3 {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .book-info p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        /* フォーム */
+        .form-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .form-section label {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-section select,
+        .form-section input,
+        .form-section textarea {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-section textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        /* ボタン */
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #3367D6;
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: #efefef;
+        }
+
+        .btn-success {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-danger {
+            background-color: #EA4335;
+            color: white;
+        }
+
+        /* 本棚セクション */
+        .bookshelf-section {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        .filter-control {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+        }
+
+        .filter-control h3 {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .filter-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .filter-chip {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            background-color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .filter-chip.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* 本棚表示 */
+        .bookshelf {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            padding: 0 4px;
+        }
+
+        .book-card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .book-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .book-card img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 4px;
+            background-color: var(--bg-color);
+        }
+
+        .book-card-title {
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .book-card-author {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .book-card-status {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .book-card-status.unread {
+            background-color: #FEE;
+            color: #C33;
+        }
+
+        .book-card-status.read {
+            background-color: #EFE;
+            color: #3C3;
+        }
+
+        /* 空状態 */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        /* トースト */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #323232;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 1000;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* ローディング */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid var(--bg-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* レスポンシブ */
+        @media (min-width: 600px) {
+            .bookshelf {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* アクセシビリティ */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 蔵書管理アプリ</h1>
+        </header>
+
+        <main id="main">
+            <!-- 初期化セクション -->
+            <div id="initSection" class="content active">
+                <div class="init-section">
+                    <div>
+                        <h2>スプレッドシート設定</h2>
+                        <p style="color: var(--text-secondary); font-size: 14px;">スプレッドシートを設定してください</p>
+                    </div>
+                    <div class="form-group" style="max-width: 300px;">
+                        <label for="spreadsheetId">スプレッドシートID</label>
+                        <input 
+                            type="text" 
+                            id="spreadsheetId" 
+                            placeholder="スプレッドシートのURLから取得"
+                            style="font-size: 12px;"
+                        >
+                        <small style="color: var(--text-secondary);">スプレッドシートのURLの /d/ の後が ID です</small>
+                    </div>
+                    <button class="btn-primary" onclick="app.initialize()" style="max-width: 300px;">
+                        設定を保存
+                    </button>
+                </div>
+            </div>
+
+            <!-- カメラセクション -->
+            <div id="cameraSection" class="content">
+                <div class="camera-section">
+                    <div id="scanner">
+                        <div class="scanner-overlay"></div>
+                    </div>
+                    <div class="scanner-info">
+                        カメラでバーコードをスキャンしてください
+                    </div>
+                </div>
+            </div>
+
+            <!-- 本棚セクション -->
+            <div id="bookshelfSection" class="content">
+                <div class="bookshelf-section">
+                    <div class="filter-control">
+                        <h3>フィルタ</h3>
+                        <div>
+                            <div style="margin-bottom: 10px;">
+                                <strong style="font-size: 12px;">読了状況</strong>
+                                <div class="filter-options" id="filterReadStatus">
+                                    <div class="filter-chip active" onclick="app.setFilter('readStatus', 'all')">すべて</div>
+                                    <div class="filter-chip" onclick="app.setFilter('readStatus', '未読')">未読</div>
+                                    <div class="filter-chip" onclick="app.setFilter('readStatus', '読了')">読了</div>
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <strong style="font-size: 12px;">場所</strong>
+                                <div class="filter-options" id="filterLocation">
+                                    <div class="filter-chip active" onclick="app.setFilter('location', 'all')">すべて</div>
+                                    <div class="filter-chip" onclick="app.setFilter('location', '自宅')">自宅</div>
+                                    <div class="filter-chip" onclick="app.setFilter('location', '実家')">実家</div>
+                                </div>
+                            </div>
+                            <div>
+                                <strong style="font-size: 12px;">タイプ</strong>
+                                <div class="filter-options" id="filterType">
+                                    <div class="filter-chip active" onclick="app.setFilter('type', 'all')">すべて</div>
+                                    <div class="filter-chip" onclick="app.setFilter('type', '商業誌')">商業誌</div>
+                                    <div class="filter-chip" onclick="app.setFilter('type', '同人誌')">同人誌</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="bookshelfContent">
+                        <div class="empty-state">
+                            <p>📚 まだ本が登録されていません</p>
+                            <p style="font-size: 12px;">カメラタブでISBNをスキャンして追加してください</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- タブナビゲーション -->
+        <nav class="tab-navigation">
+            <button class="tab-button active" onclick="app.switchTab('camera')">
+                <span>📷</span>
+                <div>カメラ</div>
+            </button>
+            <button class="tab-button" onclick="app.switchTab('bookshelf')">
+                <span>📖</span>
+                <div>本棚</div>
+            </button>
+        </nav>
+    </div>
+
+    <!-- スキャン結果モーダル -->
+    <div id="bookModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">スキャン結果</div>
+            <div id="modalBody"></div>
+            <div class="button-group">
+                <button class="btn-secondary" onclick="app.closeModal()">キャンセル</button>
+                <button class="btn-primary" onclick="app.confirmBook()">確認して登録</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 本棚詳細モーダル -->
+    <div id="bookDetailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="detailModalTitle"></div>
+            <div id="detailModalBody"></div>
+            <div class="button-group">
+                <button class="btn-danger" onclick="app.closeDetailModal()">削除</button>
+                <button class="btn-secondary" onclick="app.closeDetailModal()">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quagga.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.10.2/dist/quagga.min.js"></script>
+
+    <script>
+        const app = {
+            currentTab: 'camera',
+            currentBook: null,
+            books: [],
+            filters: {
+                readStatus: 'all',
+                location: 'all',
+                type: 'all'
+            },
+            isInitialized: false,
+            scannerActive: false,
+
+            /**
+             * 初期化
+             */
+            async initialize() {
+                const spreadsheetId = document.getElementById('spreadsheetId').value.trim();
+
+                if (!spreadsheetId) {
+                    app.showToast('スプレッドシートIDを入力してください');
+                    return;
+                }
+
+                try {
+                    await new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler((result) => {
+                                if (result.success) {
+                                    resolve(result);
+                                } else {
+                                    reject(new Error(result.message));
+                                }
+                            })
+                            .withFailureHandler(reject)
+                            .initializeSpreadsheet(spreadsheetId);
+                    });
+
+                    app.isInitialized = true;
+                    document.getElementById('initSection').style.display = 'none';
+                    app.switchTab('camera');
+                    app.showToast('設定が完了しました');
+
+                } catch (error) {
+                    app.showToast(`初期化エラー: ${error.message}`);
+                }
+            },
+
+            /**
+             * タブを切り替え
+             */
+            switchTab(tab) {
+                if (app.currentTab === tab) return;
+
+                // 前のタブを非表示
+                const contents = document.querySelectorAll('.content');
+                contents.forEach(c => c.classList.remove('active'));
+
+                const buttons = document.querySelectorAll('.tab-button');
+                buttons.forEach(b => b.classList.remove('active'));
+
+                // 新しいタブを表示
+                app.currentTab = tab;
+
+                if (tab === 'camera') {
+                    document.getElementById('cameraSection').classList.add('active');
+                    buttons[0].classList.add('active');
+                    if (!app.scannerActive) {
+                        app.initScanner();
+                    }
+                } else if (tab === 'bookshelf') {
+                    document.getElementById('bookshelfSection').classList.add('active');
+                    buttons[1].classList.add('active');
+                    app.stopScanner();
+                    app.loadBooks();
+                }
+            },
+
+            /**
+             * スキャナーを初期化
+             */
+            initScanner() {
+                const self = app;
+
+                Quagga.init(
+                    {
+                        inputStream: {
+                            name: 'Live',
+                            type: 'LiveStream',
+                            target: document.querySelector('#scanner'),
+                            constraints: {
+                                facingMode: 'environment',
+                                width: { min: 640 },
+                                height: { min: 480 }
+                            }
+                        },
+                        decoder: {
+                            readers: ['ean_reader', 'ean_13_reader', 'code_128_reader']
+                        }
+                    },
+                    function (err) {
+                        if (err) {
+                            console.error(err);
+                            app.showToast('カメラの初期化に失敗しました');
+                            return;
+                        }
+                        Quagga.start();
+                        app.scannerActive = true;
+                    }
+                );
+
+                Quagga.onDetected(function (result) {
+                    const code = result.codeResult.code;
+                    if (code && self.isValidBarcode(code)) {
+                        Quagga.stop();
+                        app.scannerActive = false;
+                        self.handleScannedISBN(code);
+                    }
+                });
+            },
+
+            /**
+             * スキャナーを停止
+             */
+            stopScanner() {
+                try {
+                    Quagga.stop();
+                    app.scannerActive = false;
+                } catch (e) {
+                    // スキャナーが起動していない場合
+                }
+            },
+
+            /**
+             * バーコードが有効かチェック
+             */
+            isValidBarcode(code) {
+                // EAN-13 または ISBN-13
+                return /^\d{13}$/.test(code);
+            },
+
+            /**
+             * スキャンされたISBNを処理
+             */
+            async handleScannedISBN(isbn) {
+                app.showToast('検索中...');
+
+                try {
+                    const bookInfo = await new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .fetchBookInfoByISBN(isbn);
+                    });
+
+                    if (bookInfo && bookInfo.found) {
+                        app.currentBook = {
+                            ...bookInfo,
+                            type: '商業誌',
+                            location: '',
+                            readStatus: '未読'
+                        };
+                        app.showBookModal(bookInfo);
+                    } else {
+                        app.currentBook = {
+                            isbn: isbn,
+                            title: '',
+                            authors: '',
+                            publisher: '',
+                            imageUrl: '',
+                            type: '同人誌',
+                            location: '',
+                            readStatus: '未読'
+                        };
+                        app.showManualEntryModal();
+                    }
+                } catch (error) {
+                    app.showToast(`エラー: ${error.message}`);
+                    app.initScanner();
+                }
+            },
+
+            /**
+             * 書籍モーダルを表示
+             */
+            showBookModal(bookInfo) {
+                const modal = document.getElementById('bookModal');
+                const modalBody = document.getElementById('modalBody');
+
+                let html = `
+                    <div class="book-preview">
+                        <img src="${bookInfo.imageUrl || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 120%22%3E%3Crect fill=%22%23ddd%22 width=%2280%22 height=%22120%22/%3E%3C/svg%3E'}" alt="${bookInfo.title}">
+                        <div class="book-info">
+                            <div>
+                                <h3>${escapeHtml(bookInfo.title)}</h3>
+                                <p>${escapeHtml(bookInfo.authors)}</p>
+                                <p>${escapeHtml(bookInfo.publisher)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <label>場所を選択してください</label>
+                        <select id="modalLocation">
+                            <option value="">選択してください</option>
+                            <option value="自宅">自宅</option>
+                            <option value="実家">実家</option>
+                        </select>
+                    </div>
+                `;
+
+                modalBody.innerHTML = html;
+                modal.classList.add('show');
+            },
+
+            /**
+             * 手動入力モーダルを表示
+             */
+            showManualEntryModal() {
+                const modal = document.getElementById('bookModal');
+                const modalBody = document.getElementById('modalBody');
+
+                let html = `
+                    <div class="form-section">
+                        <label>ISBN</label>
+                        <input type="text" id="manualISBN" value="${escapeHtml(app.currentBook.isbn)}" readonly>
+                        
+                        <label>タイトル</label>
+                        <input type="text" id="manualTitle" placeholder="タイトルを入力">
+                        
+                        <label>著者</label>
+                        <input type="text" id="manualAuthor" placeholder="著者を入力">
+                        
+                        <label>出版社</label>
+                        <input type="text" id="manualPublisher" placeholder="出版社を入力">
+                        
+                        <label>場所</label>
+                        <select id="manualLocation">
+                            <option value="">選択してください</option>
+                            <option value="自宅">自宅</option>
+                            <option value="実家">実家</option>
+                        </select>
+                    </div>
+                `;
+
+                modalBody.innerHTML = html;
+                modal.classList.add('show');
+            },
+
+            /**
+             * 書籍の確認と登録
+             */
+            async confirmBook() {
+                const location = document.getElementById('modalLocation')?.value ||
+                                document.getElementById('manualLocation')?.value;
+
+                if (!location) {
+                    app.showToast('場所を選択してください');
+                    return;
+                }
+
+                // 手動入力の場合
+                if (document.getElementById('manualTitle')) {
+                    app.currentBook.title = document.getElementById('manualTitle').value;
+                    app.currentBook.authors = document.getElementById('manualAuthor').value;
+                    app.currentBook.publisher = document.getElementById('manualPublisher').value;
+                }
+
+                app.currentBook.location = location;
+                app.currentBook.registrationDate = new Date().toISOString().split('T')[0];
+
+                try {
+                    const result = await new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .addBook(app.currentBook);
+                    });
+
+                    if (result.success) {
+                        app.showToast('書籍を登録しました');
+                        app.closeModal();
+                        app.currentBook = null;
+                        // スキャナーを再度開始
+                        app.initScanner();
+                    } else {
+                        app.showToast(`登録エラー: ${result.message}`);
+                    }
+                } catch (error) {
+                    app.showToast(`エラー: ${error.message}`);
+                }
+            },
+
+            /**
+             * モーダルを閉じる
+             */
+            closeModal() {
+                document.getElementById('bookModal').classList.remove('show');
+                app.currentBook = null;
+                app.initScanner();
+            },
+
+            /**
+             * フィルターを設定
+             */
+            setFilter(filterType, value) {
+                app.filters[filterType] = value;
+
+                // UI更新
+                const filterMap = {
+                    readStatus: 'filterReadStatus',
+                    location: 'filterLocation',
+                    type: 'filterType'
+                };
+
+                const filterContainer = document.getElementById(filterMap[filterType]);
+                if (filterContainer) {
+                    const chips = filterContainer.querySelectorAll('.filter-chip');
+                    chips.forEach(chip => {
+                        const chipValue = chip.textContent === 'すべて' ? 'all' : chip.textContent;
+                        if (chipValue === value) {
+                            chip.classList.add('active');
+                        } else {
+                            chip.classList.remove('active');
+                        }
+                    });
+                }
+
+                app.loadBooks();
+            },
+
+            /**
+             * 本を読み込んで表示
+             */
+            async loadBooks() {
+                try {
+                    const books = await new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .getAllBooks();
+                    });
+
+                    app.books = books || [];
+                    app.renderBookshelf();
+
+                } catch (error) {
+                    console.error('書籍読み込みエラー:', error);
+                    app.showToast('書籍の読み込みに失敗しました');
+                }
+            },
+
+            /**
+             * 本棚をレンダリング
+             */
+            renderBookshelf() {
+                let filteredBooks = app.books;
+
+                // フィルターを適用
+                if (app.filters.readStatus !== 'all') {
+                    filteredBooks = filteredBooks.filter(b => b.readStatus === app.filters.readStatus);
+                }
+
+                if (app.filters.location !== 'all') {
+                    filteredBooks = filteredBooks.filter(b => b.location === app.filters.location);
+                }
+
+                if (app.filters.type !== 'all') {
+                    filteredBooks = filteredBooks.filter(b => b.type === app.filters.type);
+                }
+
+                const content = document.getElementById('bookshelfContent');
+
+                if (filteredBooks.length === 0) {
+                    content.innerHTML = `
+                        <div class="empty-state">
+                            <p>📚 条件に該当する本がありません</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '<div class="bookshelf">';
+
+                filteredBooks.forEach(book => {
+                    const imageUrl = book.imageUrl || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22%3E%3Crect fill=%22%234285F4%22 width=%22100%22 height=%22150%22/%3E%3Ctext x=%2250%22 y=%2275%22 font-size=%2240%22 fill=%22white%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22%3E📖%3C/text%3E%3C/svg%3E';
+
+                    html += `
+                        <div class="book-card" onclick="app.showBookDetail('${escapeHtml(book.uuid)}')">
+                            <img src="${imageUrl}" alt="${escapeHtml(book.title)}">
+                            <div class="book-card-title">${escapeHtml(book.title)}</div>
+                            <div class="book-card-author">${escapeHtml(book.authors)}</div>
+                            <div class="book-card-status ${book.readStatus === '読了' ? 'read' : 'unread'}">
+                                ${book.readStatus}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+                content.innerHTML = html;
+            },
+
+            /**
+             * 書籍詳細を表示
+             */
+            showBookDetail(uuid) {
+                const book = app.books.find(b => b.uuid === uuid);
+                if (!book) return;
+
+                const modal = document.getElementById('bookDetailModal');
+                const title = document.getElementById('detailModalTitle');
+                const body = document.getElementById('detailModalBody');
+
+                title.textContent = book.title;
+
+                let html = `
+                    <div class="book-preview" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 16px;">
+                        <img src="${book.imageUrl || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 120%22%3E%3Crect fill=%22%23ddd%22 width=%2280%22 height=%22120%22/%3E%3C/svg%3E'}" alt="">
+                        <div class="book-info">
+                            <div>
+                                <p><strong>著者:</strong> ${escapeHtml(book.authors)}</p>
+                                <p><strong>出版社:</strong> ${escapeHtml(book.publisher)}</p>
+                                <p><strong>ISBN:</strong> ${escapeHtml(book.isbn)}</p>
+                                <p><strong>登録日:</strong> ${escapeHtml(book.registrationDate)}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <label>読了状況</label>
+                        <select id="detailReadStatus" onchange="app.updateBookReadStatus('${uuid}')">
+                            <option value="未読" ${book.readStatus === '未読' ? 'selected' : ''}>未読</option>
+                            <option value="読了" ${book.readStatus === '読了' ? 'selected' : ''}>読了</option>
+                        </select>
+
+                        <label>場所</label>
+                        <select id="detailLocation" onchange="app.updateBookLocation('${uuid}')">
+                            <option value="自宅" ${book.location === '自宅' ? 'selected' : ''}>自宅</option>
+                            <option value="実家" ${book.location === '実家' ? 'selected' : ''}>実家</option>
+                        </select>
+
+                        <label>タイプ</label>
+                        <p style="padding: 10px; background-color: var(--bg-color); border-radius: 4px;">${escapeHtml(book.type)}</p>
+                    </div>
+                `;
+
+                body.innerHTML = html;
+                modal.classList.add('show');
+            },
+
+            /**
+             * 書籍の読了状況を更新
+             */
+            async updateBookReadStatus(uuid) {
+                const readStatus = document.getElementById('detailReadStatus').value;
+
+                try {
+                    const result = await new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .updateReadStatus(uuid, readStatus);
+                    });
+
+                    if (result.success) {
+                        // ローカルデータを更新
+                        const book = app.books.find(b => b.uuid === uuid);
+                        if (book) {
+                            book.readStatus = readStatus;
+                        }
+                        app.showToast('ステータスを更新しました');
+                    }
+                } catch (error) {
+                    app.showToast(`更新エラー: ${error.message}`);
+                }
+            },
+
+            /**
+             * 書籍の場所を更新
+             */
+            async updateBookLocation(uuid) {
+                const location = document.getElementById('detailLocation').value;
+
+                try {
+                    const result = await new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .updateLocation(uuid, location);
+                    });
+
+                    if (result.success) {
+                        // ローカルデータを更新
+                        const book = app.books.find(b => b.uuid === uuid);
+                        if (book) {
+                            book.location = location;
+                        }
+                        app.showToast('場所を更新しました');
+                    }
+                } catch (error) {
+                    app.showToast(`更新エラー: ${error.message}`);
+                }
+            },
+
+            /**
+             * 詳細モーダルを閉じる
+             */
+            closeDetailModal() {
+                document.getElementById('bookDetailModal').classList.remove('show');
+            },
+
+            /**
+             * トーストを表示
+             */
+            showToast(message) {
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.textContent = message;
+                document.body.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            }
+        };
+
+        /**
+         * HTMLエスケープ
+         */
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Service Worker登録
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(registration => {
+                    console.log('Service Worker登録成功:', registration);
+                })
+                .catch(error => {
+                    console.error('Service Worker登録失敗:', error);
+                });
+        }
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初期化画面が表示されている状態でスタート
+        });
+    </script>
+</body>
+</html>
