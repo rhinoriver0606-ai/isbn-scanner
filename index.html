@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#111111">
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>蔵書アプリ（統合版）</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111111">
+
+<title>蔵書アプリ（PWA版）</title>
 
 <style>
 body {
@@ -16,35 +17,35 @@ body {
   padding-bottom: 70px;
 }
 
-/* ===== ヘッダー ===== */
 h2 {
   text-align: center;
   padding: 10px;
 }
 
-/* ===== 画面切替 ===== */
+/* 画面切替 */
 .page { display: none; padding: 10px; }
 .page.active { display: block; }
 
-/* ===== カメラ ===== */
+/* カメラ */
 video {
   width: 100%;
   border-radius: 10px;
 }
 
-/* ===== フィルター ===== */
+/* フィルター */
 .filter {
   display: flex;
-  gap: 5px;
+  gap: 6px;
   flex-wrap: wrap;
   margin-bottom: 10px;
 }
 
-select {
-  padding: 5px;
+select, input, button {
+  padding: 6px;
+  font-size: 14px;
 }
 
-/* ===== 本棚（シリーズ） ===== */
+/* シリーズ本棚 */
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -67,16 +68,16 @@ select {
 }
 
 .series-title {
-  font-weight: bold;
   font-size: 13px;
   margin-top: 5px;
 }
 
-/* ===== 巻一覧 ===== */
+/* 巻一覧 */
 .volume {
   display: flex;
   gap: 10px;
   margin-bottom: 10px;
+  align-items: center;
 }
 
 .volume img {
@@ -86,7 +87,7 @@ select {
   border-radius: 4px;
 }
 
-/* ===== タブ ===== */
+/* タブ */
 .tabbar {
   position: fixed;
   bottom: 0;
@@ -109,9 +110,9 @@ select {
 
 <h2>📚 蔵書アプリ</h2>
 
-<!-- ======================
-📷 スキャン画面
-====================== -->
+<!-- =========================
+📷 スキャン
+========================= -->
 <div id="scanPage" class="page active">
 
   <button id="startBtn">カメラ起動</button>
@@ -131,18 +132,17 @@ select {
 
   <hr>
 
-  <h3>手動登録</h3>
-  <input id="manualTitle" placeholder="タイトル">
-  <input id="manualAuthor" placeholder="著者">
+  <h3>手動登録（ISBNなし）</h3>
+  <input id="manualTitle" placeholder="タイトル"><br>
+  <input id="manualAuthor" placeholder="著者"><br>
   <button onclick="manualAdd()">登録</button>
 </div>
 
-<!-- ======================
-📚 本棚（シリーズ）
-====================== -->
+<!-- =========================
+📚 本棚（シリーズ一覧）
+========================= -->
 <div id="shelfPage" class="page">
 
-  <!-- フィルター復活 -->
   <div class="filter">
     <select id="f_status">
       <option value="all">すべて</option>
@@ -166,9 +166,9 @@ select {
   <div id="seriesGrid" class="grid"></div>
 </div>
 
-<!-- ======================
+<!-- =========================
 📖 巻詳細
-====================== -->
+========================= -->
 <div id="detailPage" class="page">
   <button onclick="back()">← 戻る</button>
   <div id="volumeList"></div>
@@ -183,15 +183,22 @@ select {
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 
 <script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxulcJMiF65Dw9_dftVUUdk3tdGllap7EnaGFsWZ2N8lyy48BmM2AuurdC3f2LcnJr1gQ/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycby-xrf8gEb0AAVeHBpiykHl-Hfz-6cPGsyXakAg9EeymnnaD5E7V7H9XCyELwzZbuMD/exec";
 
 let books = [];
 let lastISBN = "";
 let lastTime = 0;
 
-/* ======================
+/* =========================
+PWA SW登録
+========================= */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+
+/* =========================
 画面切替
-====================== */
+========================= */
 function show(id){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
@@ -199,18 +206,18 @@ function show(id){
   if(id==="shelfPage") loadBooks();
 }
 
-/* ======================
+/* =========================
 データ取得
-====================== */
+========================= */
 async function loadBooks(){
   const res = await fetch(GAS_URL);
   books = await res.json();
   renderSeries();
 }
 
-/* ======================
+/* =========================
 フィルター
-====================== */
+========================= */
 function getFiltered(){
   const s = document.getElementById("f_status").value;
   const t = document.getElementById("f_type").value;
@@ -223,9 +230,9 @@ function getFiltered(){
   );
 }
 
-/* ======================
-シリーズまとめ
-====================== */
+/* =========================
+シリーズ表示
+========================= */
 function renderSeries(){
   const data = getFiltered();
 
@@ -239,6 +246,7 @@ function renderSeries(){
   document.getElementById("seriesGrid").innerHTML =
     Object.keys(map).map(k=>{
       const items = map[k];
+
       return `
         <div class="series-card" onclick="openSeries('${k}')">
           <img src="${items[0].thumbnail || 'https://via.placeholder.com/200'}">
@@ -248,9 +256,9 @@ function renderSeries(){
     }).join("");
 }
 
-/* ======================
+/* =========================
 巻表示
-====================== */
+========================= */
 function openSeries(series){
   const items = books
     .filter(b=>b.series===series)
@@ -267,16 +275,16 @@ function openSeries(series){
   show("detailPage");
 }
 
-/* ======================
+/* =========================
 戻る
-====================== */
+========================= */
 function back(){
   show("shelfPage");
 }
 
-/* ======================
-登録
-====================== */
+/* =========================
+送信
+========================= */
 async function send(p){
   await fetch(GAS_URL,{
     method:"POST",
@@ -286,7 +294,7 @@ async function send(p){
   loadBooks();
 }
 
-/* 手動 */
+/* 手動登録 */
 function manualAdd(){
   send({
     title:manualTitle.value,
@@ -297,11 +305,14 @@ function manualAdd(){
   });
 }
 
-/* ======================
+/* =========================
 カメラ
-====================== */
+========================= */
 document.getElementById("startBtn").onclick=async()=>{
-  const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:"environment"}
+  });
+
   video.srcObject = stream;
 
   const reader = new ZXing.BrowserMultiFormatReader();
@@ -316,7 +327,7 @@ document.getElementById("startBtn").onclick=async()=>{
     lastISBN=isbn;
     lastTime=now;
 
-    const book=await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`)
+    const book = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`)
       .then(r=>r.json())
       .then(d=>d.items?.[0]?.volumeInfo);
 
@@ -335,11 +346,7 @@ document.getElementById("startBtn").onclick=async()=>{
     });
   });
 };
-
 </script>
 
-  if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
-}
 </body>
 </html>
