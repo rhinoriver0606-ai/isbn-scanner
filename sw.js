@@ -1,57 +1,93 @@
-const CACHE_NAME = "bookshelf-pwa-v1";
-
-const CACHE_FILES = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./sw.js"
+// Service Worker for PWA offline support
+const CACHE_NAME = 'bookshelf-app-v1';
+const urlsToCache = [
+  '/',
+  '/index.html'
 ];
 
-/* =========================
-インストール（キャッシュ保存）
-========================= */
-self.addEventListener("install", event => {
+// インストールイベント
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(CACHE_FILES);
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        return cache.addAll(urlsToCache).catch(() => {
+          // キャッシュ保存に失敗しても処理を続行
+          return Promise.resolve();
+        });
+      })
   );
   self.skipWaiting();
 });
 
-/* =========================
-アクティベート（古いキャッシュ削除）
-========================= */
-self.addEventListener("activate", event => {
+// アクティベーションイベント
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
       );
     })
   );
   self.clients.claim();
 });
 
-/* =========================
-フェッチ（オフライン対応）
-========================= */
-self.addEventListener("fetch", event => {
-  const req = event.request;
-
-  // APIは常にネット優先（GASなど）
-  if (req.url.includes("script.google.com") ||
-      req.url.includes("googleapis.com")) {
-    event.respondWith(fetch(req));
+// フェッチイベント (ネットワークファーストで、失敗時キャッシュ)
+self.addEventListener('fetch', event => {
+  // GASへのリクエストはスキップ
+  if (event.request.url.includes('script.google.com') || 
+      event.request.url.includes('googleapis.com')) {
     return;
   }
 
-  // それ以外はキャッシュ優先
   event.respondWith(
-    caches.match(req).then(cacheRes => {
-      return cacheRes || fetch(req);
-    })
+    fetch(event.request)
+      .then(response => {
+        // 200ステータスのレスポンスのみキャッシュ
+        if (!response || response.status !== 200 || response.type === 'error') {
+          return response;
+        }
+
+        // レスポンスをクローン
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME)
+          .then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+
+        return response;
+      })
+      .catch(() => {
+        // ネットワークエラー時はキャッシュから取得
+        return caches.match(event.request)
+          .then(response => {
+            return response || new Response('オフラインです。インターネット接続を確認してください。', {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: new Headers({
+                'Content-Type': 'text/plain'
+              })
+            });
+          });
+      })
   );
 });
+
+// バックグラウンド同期 (オプション)
+self.addEventListener('sync', event => {
+  if (event.tag === 'sync-books') {
+    event.waitUntil(syncBooks());
+  }
+});
+
+async function syncBooks() {
+  try {
+    // オフライン時に保存されたデータを同期
+    // ここに実装を追加
+  } catch (error) {
+    console.error('同期エラー:', error);
+  }
+}
