@@ -40,7 +40,7 @@
   <script src="https://unpkg.com/@zxing/library@latest"></script>
 
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzHa9VaCGpPateSg4od3aoHeZ2qoIP3nVG60H-khXdUJ0WcjG8aOjsncHQWgcCwWDqrdA/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwaVKEgJSjypWJb4f8U1nb_7HfZTTqtKdoPV1eXWo33L5x529DIBQ0ckHuvxaMamF6QEg/exec";
 
     const startBtn = document.getElementById("startBtn");
     const video = document.getElementById("video");
@@ -73,25 +73,22 @@
     }
 
     // 🔥 GAS送信
-    async function sendToSheet(payload) {
-      try {
-        const formData = new URLSearchParams();
+async function sendToSheet(payload) {
+  try {
+    const res = await fetch(GAS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+      },
+      body: new URLSearchParams(payload).toString()
+    });
 
-        Object.keys(payload).forEach(key => {
-          formData.append(key, payload[key]);
-        });
+    console.log(await res.text());
 
-        const res = await fetch(GAS_URL, {
-          method: "POST",
-          body: formData
-        });
-
-        console.log(await res.text());
-
-      } catch (err) {
-        console.error("送信失敗:", err);
-      }
-    }
+  } catch (err) {
+    console.error("送信失敗:", err);
+  }
+}
 
     startBtn.addEventListener("click", async () => {
       const stream = await navigator.mediaDevices.getUserMedia({
