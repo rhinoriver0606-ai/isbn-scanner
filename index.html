@@ -57,23 +57,23 @@
     const GAS_URL = "https://script.google.com/macros/s/AKfycbz_4kYGM6aDKDl8Tp4duZkQws5_Z-vepI1o3oSrc3-1PBZrgg-eJySl8VFZ4STi5U5bAQ/exec";
 
     // スプレッドシート送信
-    async function sendToSheet(isbn) {
-      try {
-        const res = await fetch(GAS_URL, {
-          method: "POST",
-          body: JSON.stringify({ isbn }),
-          headers: {
-            "Content-Type": "application/json"
-          }
-        });
+async function sendToSheet(isbn) {
+  try {
+    const formData = new URLSearchParams();
+    formData.append("isbn", isbn);
 
-        const text = await res.text();
-        console.log("GASレスポンス:", text);
+    const res = await fetch(GAS_URL, {
+      method: "POST",
+      body: formData
+    });
 
-      } catch (err) {
-        console.error("送信失敗:", err);
-      }
-    }
+    const text = await res.text();
+    console.log("GASレスポンス:", text);
+
+  } catch (err) {
+    console.error("送信失敗:", err);
+  }
+}
 
     startBtn.addEventListener('click', async () => {
       try {
