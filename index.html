@@ -3,79 +3,116 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>蔵書スキャナー</title>
+  <title>蔵書アプリ</title>
 
   <style>
     body {
       font-family: sans-serif;
-      text-align: center;
       padding: 10px;
+      background: #f5f5f5;
+    }
+
+    h2 {
+      text-align: center;
     }
 
     video {
       width: 100%;
       max-width: 400px;
       border: 1px solid #ccc;
-      margin-top: 10px;
+      margin-bottom: 10px;
     }
 
     #result {
-      font-size: 16px;
-      margin-top: 10px;
+      font-size: 14px;
       color: green;
-      word-break: break-all;
+      margin-bottom: 10px;
+      white-space: pre-line;
+    }
+
+    #search {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      margin: 10px 0;
+    }
+
+    .book {
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .title {
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .meta {
+      font-size: 13px;
+      color: #555;
+    }
+
+    .isbn {
+      font-size: 11px;
+      color: #888;
     }
   </style>
 </head>
 
 <body>
-  <h2>蔵書スキャナー</h2>
 
-  <button id="startBtn">カメラ起動</button>
+<h2>📚 蔵書アプリ</h2>
 
-  <video id="video" autoplay playsinline></video>
+<button id="startBtn">カメラ起動</button>
+<video id="video" autoplay playsinline></video>
 
-  <div id="result">未スキャン</div>
+<div id="result">未スキャン</div>
 
-  <script src="https://unpkg.com/@zxing/library@latest"></script>
+<input id="search" placeholder="タイトル・著者で検索">
 
-  <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzpE20JNCVBfuW0KNBYJck4ZUfCd-i8pJhzAN95wwj9iCRR3eBGxRMxMAoXhcQL0Bpigg/exec";
+<div id="list">読み込み中...</div>
 
-    const startBtn = document.getElementById("startBtn");
-    const video = document.getElementById("video");
-    const result = document.getElementById("result");
+<script src="https://unpkg.com/@zxing/library@latest"></script>
 
-    let lastISBN = "";
-    let lastTime = 0;
+<script>
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbzpE20JNCVBfuW0KNBYJck4ZUfCd-i8pJhzAN95wwj9iCRR3eBGxRMxMAoXhcQL0Bpigg/exec";
 
-    // 🔥 Google Books API
-    async function fetchBookInfo(isbn) {
-      try {
-        const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`;
-        const res = await fetch(url);
-        const data = await res.json();
+  const startBtn = document.getElementById("startBtn");
+  const video = document.getElementById("video");
+  const result = document.getElementById("result");
+  const listEl = document.getElementById("list");
 
-        if (!data.items) return null;
+  let books = [];
+  let lastISBN = "";
+  let lastTime = 0;
 
-        const info = data.items[0].volumeInfo;
+  // -----------------------------
+  // 書籍取得
+  // -----------------------------
+  async function fetchBookInfo(isbn) {
+    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`;
+    const res = await fetch(url);
+    const data = await res.json();
 
-        return {
-          title: info.title || "",
-          author: (info.authors || []).join(", "),
-          publisher: info.publisher || ""
-        };
+    if (!data.items) return null;
 
-      } catch (err) {
-        console.error("書籍取得失敗:", err);
-        return null;
-      }
-    }
+    const info = data.items[0].volumeInfo;
 
-    // 🔥 GAS送信
-async function sendToSheet(payload) {
-  try {
-    const res = await fetch(GAS_URL, {
+    return {
+      title: info.title || "",
+      author: (info.authors || []).join(", "),
+      publisher: info.publisher || ""
+    };
+  }
+
+  // -----------------------------
+  // GAS送信
+  // -----------------------------
+  async function sendToSheet(payload) {
+    await fetch(GAS_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
@@ -83,59 +120,88 @@ async function sendToSheet(payload) {
       body: new URLSearchParams(payload).toString()
     });
 
-    console.log(await res.text());
-
-  } catch (err) {
-    console.error("送信失敗:", err);
+    loadBooks(); // 🔥 送信後に再読み込み
   }
-}
 
-    startBtn.addEventListener("click", async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
-      });
+  // -----------------------------
+  // 一覧取得
+  // -----------------------------
+  async function loadBooks() {
+    const res = await fetch(GAS_URL);
+    books = await res.json();
+    render(books);
+  }
 
-      video.srcObject = stream;
+  function render(data) {
+    listEl.innerHTML = data.map(b => `
+      <div class="book">
+        <div class="title">${b.title || "（タイトルなし）"}</div>
+        <div class="meta">著者: ${b.author || "-"}</div>
+        <div class="meta">出版社: ${b.publisher || "-"}</div>
+        <div class="isbn">ISBN: ${b.isbn}</div>
+      </div>
+    `).join("");
+  }
 
-      const codeReader = new ZXing.BrowserMultiFormatReader();
+  document.getElementById("search").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    render(books.filter(b =>
+      (b.title || "").toLowerCase().includes(q) ||
+      (b.author || "").toLowerCase().includes(q)
+    ));
+  });
 
-      codeReader.decodeFromVideoDevice(null, video, async (res) => {
-        if (!res) return;
+  // -----------------------------
+  // カメラ
+  // -----------------------------
+  startBtn.addEventListener("click", async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
 
-        const isbn = res.getText();
+    video.srcObject = stream;
 
-        const now = Date.now();
+    const codeReader = new ZXing.BrowserMultiFormatReader();
 
-        if (isbn === lastISBN && now - lastTime < 5000) return;
+    codeReader.decodeFromVideoDevice(null, video, async (res) => {
+      if (!res) return;
 
-        lastISBN = isbn;
-        lastTime = now;
+      const isbn = res.getText();
+      const now = Date.now();
 
-        result.textContent = "ISBN: " + isbn + "（取得中...）";
+      // 5秒重複防止
+      if (isbn === lastISBN && now - lastTime < 5000) return;
 
-        // 🔥 書籍情報取得
-        const book = await fetchBookInfo(isbn);
+      lastISBN = isbn;
+      lastTime = now;
 
-        if (!book) {
-          result.textContent = "書籍情報なし: " + isbn;
-          return;
-        }
+      result.textContent = "ISBN: " + isbn + "\n取得中...";
 
-        result.textContent =
-          `ISBN: ${isbn}\n` +
-          `タイトル: ${book.title}\n` +
-          `著者: ${book.author}\n` +
-          `出版社: ${book.publisher}`;
+      const book = await fetchBookInfo(isbn);
 
-        // 🔥 GAS送信
-        await sendToSheet({
-          isbn,
-          title: book.title,
-          author: book.author,
-          publisher: book.publisher
-        });
+      if (!book) {
+        result.textContent = "書籍情報なし";
+        return;
+      }
+
+      result.textContent =
+        `ISBN: ${isbn}\n` +
+        `タイトル: ${book.title}\n` +
+        `著者: ${book.author}\n` +
+        `出版社: ${book.publisher}`;
+
+      await sendToSheet({
+        isbn,
+        title: book.title,
+        author: book.author,
+        publisher: book.publisher
       });
     });
-  </script>
+  });
+
+  // 初回ロード
+  loadBooks();
+</script>
+
 </body>
 </html>
