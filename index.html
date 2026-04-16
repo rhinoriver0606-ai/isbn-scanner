@@ -103,6 +103,32 @@ select, input, button {
   border: none;
   color: white;
 }
+
+.carousel {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  padding: 10px;
+  scroll-snap-type: x mandatory;
+}
+
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.card {
+  flex: 0 0 auto;
+  width: 90px;
+  scroll-snap-align: start;
+}
+
+.card img {
+  width: 90px;
+  height: 130px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+  
 </style>
 </head>
 
@@ -243,17 +269,26 @@ function renderSeries(){
     map[key].push(b);
   });
 
-  document.getElementById("seriesGrid").innerHTML =
-    Object.keys(map).map(k=>{
-      const items = map[k];
+  let html = "";
 
-      return `
-        <div class="series-card" onclick="openSeries('${k}')">
-          <img src="${items[0].thumbnail || 'https://via.placeholder.com/200'}">
-          <div class="series-title">${k}</div>
-        </div>
-      `;
-    }).join("");
+  Object.keys(map).forEach(series=>{
+    const items = map[series]
+      .sort((a,b)=>Number(a.volume)-Number(b.volume));
+
+    html += `
+      <h3 style="margin:10px 0">${series}</h3>
+      <div class="carousel">
+        ${items.map(b=>`
+          <div class="card">
+            <img src="${b.thumbnail}">
+            <div style="font-size:10px">${b.volume||""}</div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  });
+
+  document.getElementById("seriesGrid").innerHTML = html;
 }
 
 /* =========================
