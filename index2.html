@@ -25,18 +25,15 @@
 
     /* 🔥 本棚グリッド */
 #list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
   gap: 10px;
 }
 
-    .book {
-      background: white;
-      border-radius: 8px;
-      padding: 5px;
-      text-align: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
+.book {
+  width: 100%;
+  box-sizing: border-box;
+}
 
 .book img {
   height: 120px;
