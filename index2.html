@@ -23,13 +23,20 @@
       margin-bottom: 10px;
     }
 
-    .book {
-      background: white;
-      padding: 10px;
-      margin-bottom: 10px;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
+.book {
+  background: white;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.book img {
+  width: 60px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 4px;
+}
 
     .title {
       font-size: 18px;
@@ -60,7 +67,7 @@
 
 <script>
   // 🔥 GASのURL（必ずあなたのURLに変更）
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbxzuqUCM9Bju9Z5aLTC5x5DdXFiyBBO6HAAfdJlie8Q4PCkPIoOx9-XQDDIHM6KBtSPoQ/exec";
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbwA_9v_uqTQfcUX9CNx8XU6xwplFWJgnZGx5PlDW9b-U-EIr54IeySZ24Z51SumaC4erw/exec";
 
   let books = [];
 
@@ -85,15 +92,18 @@
       return;
     }
 
-    list.innerHTML = data.map(b => `
-      <div class="book">
-        <div class="title">${b.title || "（タイトルなし）"}</div>
-        <div class="meta">著者: ${b.author || "-"}</div>
-        <div class="meta">出版社: ${b.publisher || "-"}</div>
-        <div class="isbn">ISBN: ${b.isbn}</div>
-      </div>
-    `).join("");
-  }
+list.innerHTML = data.map(b => `
+  <div class="book">
+    <img src="${b.thumbnail || 'https://via.placeholder.com/60'}">
+    <div>
+      <div class="title">${b.title || "（タイトルなし）"}</div>
+      <div class="meta">著者: ${b.author || "-"}</div>
+      <div class="meta">出版社: ${b.publisher || "-"}</div>
+      <div class="isbn">ISBN: ${b.isbn}</div>
+    </div>
+  </div>
+`).join("");
+}
 
   document.getElementById("search").addEventListener("input", e => {
     const q = e.target.value.toLowerCase();
