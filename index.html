@@ -22,17 +22,14 @@ h2 {
   padding: 10px;
 }
 
-/* 画面切替 */
 .page { display: none; padding: 10px; }
 .page.active { display: block; }
 
-/* カメラ */
 video {
   width: 100%;
   border-radius: 10px;
 }
 
-/* フィルター */
 .filter {
   display: flex;
   gap: 6px;
@@ -45,7 +42,6 @@ select, input, button {
   font-size: 14px;
 }
 
-/* シリーズ本棚 */
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -72,7 +68,6 @@ select, input, button {
   margin-top: 5px;
 }
 
-/* 巻一覧 */
 .volume {
   display: flex;
   gap: 10px;
@@ -87,7 +82,6 @@ select, input, button {
   border-radius: 4px;
 }
 
-/* タブ */
 .tabbar {
   position: fixed;
   bottom: 0;
@@ -128,7 +122,6 @@ select, input, button {
   object-fit: cover;
   border-radius: 6px;
 }
-  
 </style>
 </head>
 
@@ -136,9 +129,6 @@ select, input, button {
 
 <h2>📚 蔵書アプリ</h2>
 
-<!-- =========================
-📷 スキャン
-========================= -->
 <div id="scanPage" class="page active">
 
   <button id="startBtn">カメラ起動</button>
@@ -164,9 +154,6 @@ select, input, button {
   <button onclick="manualAdd()">登録</button>
 </div>
 
-<!-- =========================
-📚 本棚（シリーズ一覧）
-========================= -->
 <div id="shelfPage" class="page">
 
   <div class="filter">
@@ -192,15 +179,11 @@ select, input, button {
   <div id="seriesGrid" class="grid"></div>
 </div>
 
-<!-- =========================
-📖 巻詳細
-========================= -->
 <div id="detailPage" class="page">
   <button onclick="back()">← 戻る</button>
   <div id="volumeList"></div>
 </div>
 
-<!-- タブ -->
 <div class="tabbar">
   <button onclick="show('scanPage')">📷</button>
   <button onclick="show('shelfPage')">📚</button>
@@ -215,35 +198,22 @@ let books = [];
 let lastISBN = "";
 let lastTime = 0;
 
-/* =========================
-PWA SW登録
-========================= */
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js");
 }
 
-/* =========================
-画面切替
-========================= */
 function show(id){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
-
   if(id==="shelfPage") loadBooks();
 }
 
-/* =========================
-データ取得
-========================= */
 async function loadBooks(){
   const res = await fetch(GAS_URL);
   books = await res.json();
   renderSeries();
 }
 
-/* =========================
-フィルター
-========================= */
 function getFiltered(){
   const s = document.getElementById("f_status").value;
   const t = document.getElementById("f_type").value;
@@ -256,13 +226,10 @@ function getFiltered(){
   );
 }
 
-/* =========================
-シリーズ表示
-========================= */
 function renderSeries(){
   const data = getFiltered();
-
   const map = {};
+
   data.forEach(b=>{
     const key = b.series?.trim() || "その他";
     if(!map[key]) map[key]=[];
@@ -280,7 +247,7 @@ function renderSeries(){
       <div class="carousel">
         ${items.map(b=>`
           <div class="card">
-            <img src="${b.thumbnail}">
+            <img src="${b.thumbnail || ''}">
             <div style="font-size:10px">${b.volume||""}</div>
           </div>
         `).join("")}
@@ -291,9 +258,6 @@ function renderSeries(){
   document.getElementById("seriesGrid").innerHTML = html;
 }
 
-/* =========================
-巻表示
-========================= */
 function openSeries(series){
   const items = books
     .filter(b=>b.series===series)
@@ -310,16 +274,10 @@ function openSeries(series){
   show("detailPage");
 }
 
-/* =========================
-戻る
-========================= */
 function back(){
   show("shelfPage");
 }
 
-/* =========================
-送信
-========================= */
 async function send(p){
   await fetch(GAS_URL,{
     method:"POST",
@@ -329,20 +287,21 @@ async function send(p){
   loadBooks();
 }
 
-/* 手動登録 */
+/* ✅ 修正済 */
 function manualAdd(){
+  const loc = document.getElementById("location").value;
+  const typ = document.getElementById("type").value;
+
   send({
-    title:manualTitle.value,
-    author:manualAuthor.value,
-    location:location.value,
-    type:type.value,
+    title: manualTitle.value,
+    author: manualAuthor.value,
+    location: loc,
+    type: typ,
     isbn:""
   });
 }
 
-/* =========================
-カメラ
-========================= */
+/* ✅ 修正済 */
 document.getElementById("startBtn").onclick=async()=>{
   const stream = await navigator.mediaDevices.getUserMedia({
     video:{facingMode:"environment"}
@@ -370,14 +329,17 @@ document.getElementById("startBtn").onclick=async()=>{
 
     result.textContent=book.title;
 
+    const loc = document.getElementById("location").value;
+    const typ = document.getElementById("type").value;
+
     send({
       isbn,
-      title:book.title,
-      author:book.authors?.join(","),
-      publisher:book.publisher,
-      thumbnail:book.imageLinks?.thumbnail,
-      location:location.value,
-      type:type.value
+      title:book.title || "",
+      author:book.authors?.join(",") || "",
+      publisher:book.publisher || "",
+      thumbnail:book.imageLinks?.thumbnail || "",
+      location: loc,
+      type: typ
     });
   });
 };
