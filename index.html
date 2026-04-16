@@ -76,7 +76,7 @@ video {
 
 button {
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 6px 10px;
 }
 </style>
 </head>
@@ -84,6 +84,13 @@ button {
 <body>
 
 <h2>📚 蔵書アプリ</h2>
+
+<!-- 🔥 追加：本棚ボタン -->
+<div style="text-align:center; margin:10px;">
+  <button onclick="location.href='index2.html'">
+    📚 本棚を見る
+  </button>
+</div>
 
 <button id="startBtn">カメラ起動</button>
 <video id="video" autoplay playsinline></video>
@@ -151,7 +158,7 @@ async function loadBooks() {
   applyFilter();
 }
 
-// 🧱 描画（🔥ここだけ修正済み）
+// 🧱 描画
 function render(data) {
   document.getElementById("list").innerHTML = data.map(b => `
     <div class="card">
