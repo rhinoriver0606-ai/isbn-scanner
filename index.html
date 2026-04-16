@@ -14,36 +14,31 @@ body {
   padding-bottom: 60px;
 }
 
-/* ヘッダー */
 h2 {
   text-align: center;
   padding: 10px;
 }
 
-/* ページ */
 .page { display: none; padding: 10px; }
 .page.active { display: block; }
 
-/* カメラ */
 video {
   width: 100%;
   border-radius: 10px;
 }
 
-/* ===== Kindle風本棚 ===== */
+/* 本棚 */
 .shelf {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
-/* 本（Kindle風） */
 .book {
   background: #1e1e1e;
   border-radius: 6px;
   padding: 6px;
   text-align: center;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.5);
 }
 
 .book img {
@@ -59,23 +54,19 @@ video {
   color: #ddd;
 }
 
-/* ステータス */
 .status {
   font-size: 10px;
-  margin-top: 2px;
   color: #aaa;
 }
 
 .done { color: #4caf50; }
 
-/* タブ */
 .tabbar {
   position: fixed;
   bottom: 0;
   width: 100%;
   display: flex;
   background: #222;
-  border-top: 1px solid #333;
 }
 
 .tabbar button {
@@ -92,14 +83,20 @@ video {
 
 <h2>📚 蔵書アプリ</h2>
 
-<!-- 📷 スキャン -->
+<!-- スキャン -->
 <div id="scanPage" class="page active">
 
   <button id="startBtn">カメラ起動</button>
 
+  <!-- 場所 -->
   <select id="location">
     <option value="自宅">自宅</option>
     <option value="実家">実家</option>
+  </select>
+
+  <!-- 種別（追加） -->
+  <select id="type">
+    <option value="商業誌">商業誌</option>
     <option value="同人誌">同人誌</option>
   </select>
 
@@ -108,14 +105,14 @@ video {
 
   <hr>
 
-  <h3>✍ ISBNなし（同人誌など）</h3>
+  <h3>✍ ISBNなし登録</h3>
   <input id="manualTitle" placeholder="タイトル"><br>
   <input id="manualAuthor" placeholder="著者"><br>
   <button onclick="manualAdd()">登録</button>
 
 </div>
 
-<!-- 📚 本棚 -->
+<!-- 本棚 -->
 <div id="shelfPage" class="page">
 
   <select id="filterStatus">
@@ -128,6 +125,12 @@ video {
     <option value="all">すべて</option>
     <option value="自宅">自宅</option>
     <option value="実家">実家</option>
+  </select>
+
+  <!-- 種別フィルター（追加） -->
+  <select id="filterType">
+    <option value="all">すべて</option>
+    <option value="商業誌">商業誌</option>
     <option value="同人誌">同人誌</option>
   </select>
 
@@ -144,7 +147,7 @@ video {
 
 <script>
 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzot1qtoq5hYX9Y-edkYb_pNCfQ4DQ82jWf7L150VOoLuaermyQznGTwWYTA4I-ayhplQ/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyyW65FGMwujIPP0RAmcZofK0uX-K1d8Zy_yMX79dXFicnGXxgUGWJ1SDvaNPdRTubP/exec";
 
 let lastISBN = "";
 let lastTime = 0;
@@ -154,11 +157,10 @@ let books = [];
 function showPage(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
-
   if (id === "shelfPage") loadBooks();
 }
 
-/* ISBN→本情報 */
+/* ISBN取得 */
 async function fetchBookInfo(isbn) {
   const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
   const data = await res.json();
@@ -181,23 +183,19 @@ async function sendToSheet(p) {
     headers: {"Content-Type":"application/x-www-form-urlencoded"},
     body: new URLSearchParams(p)
   });
-
   loadBooks();
 }
 
-/* 手動登録（ISBNなしOK） */
+/* 手動登録 */
 async function manualAdd() {
-  const title = document.getElementById("manualTitle").value;
-  const author = document.getElementById("manualAuthor").value;
-  const location = document.getElementById("location").value;
-
   await sendToSheet({
     isbn: "",
-    title,
-    author,
+    title: document.getElementById("manualTitle").value,
+    author: document.getElementById("manualAuthor").value,
     publisher: "",
     thumbnail: "",
-    location
+    location: document.getElementById("location").value,
+    type: document.getElementById("type").value
   });
 }
 
@@ -208,18 +206,20 @@ async function loadBooks() {
   render();
 }
 
-/* フィルター */
+/* 描画 */
 function render() {
 
   const status = document.getElementById("filterStatus").value;
   const loc = document.getElementById("filterLocation").value;
+  const type = document.getElementById("filterType").value;
 
   const filtered = books.filter(b => {
 
     const okStatus = status === "all" || b.status === status;
     const okLoc = loc === "all" || b.location === loc;
+    const okType = type === "all" || b.type === type;
 
-    return okStatus && okLoc;
+    return okStatus && okLoc && okType;
   });
 
   document.getElementById("shelf").innerHTML =
@@ -233,6 +233,11 @@ function render() {
       </div>
     `).join("");
 }
+
+/* フィルター */
+document.getElementById("filterStatus").addEventListener("change", render);
+document.getElementById("filterLocation").addEventListener("change", render);
+document.getElementById("filterType").addEventListener("change", render);
 
 /* カメラ */
 document.getElementById("startBtn").addEventListener("click", async () => {
@@ -268,14 +273,11 @@ document.getElementById("startBtn").addEventListener("click", async () => {
       author: book.author,
       publisher: book.publisher,
       thumbnail: book.thumbnail,
-      location: document.getElementById("location").value
+      location: document.getElementById("location").value,
+      type: document.getElementById("type").value
     });
   });
 });
-
-/* フィルター更新 */
-document.getElementById("filterStatus").addEventListener("change", render);
-document.getElementById("filterLocation").addEventListener("change", render);
 
 </script>
 
